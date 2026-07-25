@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinIntel | Command Center</title>
+  <meta name="description" content="Enterprise Financial Intelligence Platform" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="index.css?v=3" />
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-name">FININTEL</span>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" id="nav-workspace" onclick="switchTab('workspace')">
+      Workspace
+    </button>
+    <button class="nav-item" id="nav-companies" onclick="switchTab('companies')">
+      Portfolio
+    </button>
+    <button class="nav-item" id="nav-audit" onclick="switchTab('audit')">
+      Audit Trail
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="system-status">
+      <div class="status-dot" id="api-status-dot"></div>
+      <span id="api-status-text">Connecting...</span>
+    </div>
+  </div>
+</aside>
+
+<main class="main-content">
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <h1 id="page-title">Workspace</h1>
+      <span class="page-subtitle" id="page-subtitle">Unified Analysis Command Center</span>
+    </div>
+    <div class="top-bar-right">
+      <div class="api-badge">API v1.0</div>
+    </div>
+  </header>
+
+  <!-- WORKSPACE TAB -->
+  <section class="tab-content active" id="tab-workspace">
+    <!-- Master Company Selector -->
+    <div class="workspace-header card">
+      <div class="form-row align-items-end" style="margin-bottom:0;">
+        <div class="form-group flex-2">
+          <label>Target Company Context</label>
+          <select id="w-company" onchange="onWorkspaceCompanyChange()">
+            <option value="">Select a company to begin analysis...</option>
+          </select>
+        </div>
+        <div class="form-group flex-1">
+          <label>Start Year</label>
+          <input type="number" id="w-start-year" placeholder="2024" value="2024" />
+        </div>
+        <div class="form-group flex-1">
+          <label>End Year</label>
+          <input type="number" id="w-end-year" placeholder="2026" value="2026" />
+        </div>
+        <div class="form-group flex-1">
+          <label>Fiscal Period</label>
+          <select id="w-period">
+            <option value="FY">FY</option>
+            <option value="Q1">Q1</option>
+            <option value="Q2">Q2</option>
+            <option value="Q3">Q3</option>
+            <option value="Q4">Q4</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state for when no company is selected -->
+    <div id="workspace-empty" class="card mt-4" style="text-align:center; padding: 40px;">
+      <h3 style="margin-bottom: 8px;">No Company Selected</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px;">You must select a target company to unlock the workspace for data ingestion and modeling.</p>
+      <button class="btn btn-primary" onclick="switchTab('companies')">Go to Portfolio to Add a Company</button>
+    </div>
+
+    <!-- The workspace body (hidden until company selected) -->
+    <div id="workspace-body" class="hidden mt-4">
+      
+      <!-- 1-Click Analysis -->
+      <div class="card mb-4" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-surface); padding: 24px; border-left: 4px solid var(--accent-blue);">
+        <div>
+          <h3 style="margin-bottom: 8px;">1-Click Financial Analysis</h3>
+          <p style="color: var(--text-muted); font-size: 14px; max-width: 600px;">
+            Automatically download the latest financials via Yahoo Finance API, normalize metrics, and run deterministic ratio analysis.
+          </p>
+        </div>
+        <div>
+          <button class="btn btn-primary" id="btn-auto-run" onclick="runAutoAnalysis()" style="padding: 12px 24px; font-size: 16px;">▶ Run Full Analysis</button>
+        </div>
+      </div>
+
+      <!-- Saved Reports -->
+      <div class="card mb-4">
+        <h3 class="section-title">Saved Reports Dashboard</h3>
+        <table class="table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th style="text-align: left;">Report Name</th>
+              <th style="text-align: left;">Fiscal Year</th>
+              <th style="text-align: left;">Date Generated</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="reports-tbody">
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">No reports generated yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Report Viewer -->
+      <div id="report-viewer" class="card mt-4 hidden" style="border: 1px solid var(--accent-blue);">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 id="rv-title">Report Title</h3>
+          <button class="btn btn-secondary" onclick="document.getElementById('report-viewer').classList.add('hidden')" style="padding: 4px 12px;">Close</button>
+        </div>
+        <div id="rv-metrics" class="mt-4" style="overflow-x: auto;"></div>
+      </div>
+
+      <!-- Advanced Manual Ingestion -->
+      <details style="margin-top: 24px;">
+        <summary style="cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface);">Advanced: Manual Data Ingestion & Modeling</summary>
+        <div class="two-col-grid mt-4">
+          <!-- Ingestion Column -->
+          <div class="card">
+            <div class="card-header"><h3>Data Ingestion</h3></div>
+            
+            <div class="panel-section">
+              <h4 class="panel-subtitle">1. Upload Financials (CSV/Excel)</h4>
+              <form id="upload-form" onsubmit="uploadDocument(event)" enctype="multipart/form-data">
+                <div class="form-group mb-2">
+                  <label>Source Authority</label>
+                  <select id="u-authority">
+                    <option value="sec_filing">SEC Filing</option>
+                    <option value="earnings_call">Earnings Call</option>
+                    <option value="unknown" selected>Unknown</option>
+                  </select>
+                </div>
+                <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+                  <p>Drop file(s) or click to browse</p>
+                  <span class="dropzone-hint">.csv, .xlsx</span>
+                  <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" multiple onchange="handleFileSelect(event)" />
+                </div>
+                <div id="file-selected" class="file-selected hidden"></div>
+                <button type="submit" class="btn btn-primary mt-2 w-full" id="upload-btn">Ingest Files</button>
+              </form>
+            </div>
+
+            <div class="panel-divider">OR</div>
+
+            <div class="panel-section">
+              <h4 class="panel-subtitle">2. Fetch Market Data</h4>
+              <div class="form-row mb-2">
+                <div class="form-group flex-1">
+                  <label>Start Date</label>
+                  <input type="date" id="m-start" required />
+                </div>
+                <div class="form-group flex-1">
+                  <label>End Date</label>
+                  <input type="date" id="m-end" required />
+                </div>
+              </div>
+              <button class="btn btn-secondary w-full" id="fetch-btn" onclick="fetchMarketData()">Fetch & Ingest Prices</button>
+            </div>
+          </div>
+
+          <!-- Analysis Column -->
+          <div class="card">
+            <div class="card-header"><h3>Financial Modeling</h3></div>
+            
+            <div class="panel-section">
+              <h4 class="panel-subtitle">Run Full Ratios Analysis</h4>
+              <p class="text-muted" style="margin-bottom:12px;">Executes deterministic calculations based on ingested data in context.</p>
+              <button class="btn btn-primary w-full" id="analyze-btn" onclick="runAnalytics()">Run Analysis</button>
+            </div>
+
+            <div class="panel-divider">AND / OR</div>
+
+            <div class="panel-section">
+              <h4 class="panel-subtitle">Run DCF Valuation</h4>
+              <div class="form-group mb-2">
+                <label>FCFs (comma-separated, $M)</label>
+                <input type="text" id="d-fcf" placeholder="50, 60, 72, 86, 103" />
+              </div>
+              <div class="form-row mb-2">
+                <div class="form-group flex-1">
+                  <label>WACC (%)</label>
+                  <input type="number" id="d-wacc" value="10" step="0.1" />
+                </div>
+                <div class="form-group flex-1">
+                  <label>Term. Growth (%)</label>
+                  <input type="number" id="d-tgr" value="3" step="0.1" />
+                </div>
+                <div class="form-group flex-1">
+                  <label>Net Debt ($M)</label>
+                  <input type="number" id="d-debt" value="0" step="1" />
+                </div>
+              </div>
+              <button class="btn btn-secondary w-full" onclick="runDCF()">Calculate DCF</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Viewers -->
+        <div id="analytics-result" class="card mt-4 hidden">
+          <div class="card-header"><h3>Analysis Results</h3></div>
+          <div class="metrics-grid" id="metrics-cards"></div>
+          <div class="mt-4"><canvas id="metrics-chart" height="80"></canvas></div>
+        </div>
+        <div id="analytics-error" class="alert alert-error mt-4 hidden"></div>
+
+        <div id="dcf-result-card" class="card mt-4 hidden">
+          <div class="card-header"><h3>DCF Results</h3></div>
+          <div id="dcf-result-body"></div>
+          <div class="mt-4"><canvas id="dcf-chart" height="80"></canvas></div>
+        </div>
+        <div id="dcf-error" class="alert alert-error mt-4 hidden"></div>
+
+        <!-- General jobs/fetch results pop below too -->
+        <div id="upload-result" class="card mt-4 hidden">
+          <div class="card-header"><h3>Ingestion Result</h3></div>
+          <div id="upload-result-body"></div>
+        </div>
+        <div id="fetch-result" class="card mt-4 hidden">
+          <div class="card-header"><h3>Market Data Result</h3></div>
+          <div id="fetch-result-body"></div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- PORTFOLIO / COMPANIES TAB -->
+  <section class="tab-content" id="tab-companies">
+    <div class="card">
+      <div class="card-header">
+        <h3>Add Company to Portfolio</h3>
+      </div>
+      <form class="inline-form" id="company-form" onsubmit="createCompany(event)">
+        <div class="form-row align-items-end">
+          <div class="form-group flex-2">
+            <label>Ticker Symbol</label>
+            <input type="text" id="f-ticker" placeholder="e.g. AAPL, MSFT, TSLA" maxlength="12" required />
+          </div>
+          <div class="form-group flex-1">
+            <button type="submit" class="btn btn-primary w-full" id="btn-add-company">Search & Add</button>
+          </div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Company details will be automatically fetched via Yahoo Finance.</div>
+      </form>
+    </div>
+    <div class="card mt-4">
+      <div class="card-header"><h3>Portfolio</h3></div>
+      <div id="companies-table-wrap">
+        <div class="empty-state">No companies yet.</div>
+      </div>
+    </div>
+    <div id="company-alert" class="alert hidden"></div>
+  </section>
+
+  <!-- AUDIT TAB -->
+  <section class="tab-content" id="tab-audit">
+    <div class="card">
+      <div class="card-header"><h3>Audit Trail Explorer</h3><span class="chip" style="font-size:10px; border:1px solid var(--border); padding:2px 6px;">Immutable</span></div>
+      <div id="audit-log-list" class="audit-list">
+        <div class="empty-state">Audit events will appear here as you use the platform.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast-container"></div>
+<script src="app.js"></script>
+</body>
+</html>

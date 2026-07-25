@@ -1,0 +1,15 @@
+metric_key,value,fiscal_year,fiscal_period,currency,section
+revenue,,2024,FY,USD,Income Statement
+cost_of_goods_sold,,2024,FY,USD,Income Statement
+gross_profit,,2024,FY,USD,Income Statement
+operating_income,,2024,FY,USD,Income Statement
+net_income,,2024,FY,USD,Income Statement
+ebitda,,2024,FY,USD,Income Statement
+total_assets,,2024,FY,USD,Balance Sheet
+total_liabilities,,2024,FY,USD,Balance Sheet
+total_equity,,2024,FY,USD,Balance Sheet
+current_assets,,2024,FY,USD,Balance Sheet
+current_liabilities,,2024,FY,USD,Balance Sheet
+operating_cf,,2024,FY,USD,Cash Flow
+capex,,2024,FY,USD,Cash Flow
+free_cash_flow,,2024,FY,USD,Cash Flow

@@ -1,0 +1,15 @@
+metric_key,value,fiscal_year,fiscal_period,currency,section
+revenue,394328000000,2024,FY,USD,Income Statement
+cost_of_goods_sold,210352000000,2024,FY,USD,Income Statement
+gross_profit,183976000000,2024,FY,USD,Income Statement
+operating_income,123216000000,2024,FY,USD,Income Statement
+net_income,93736000000,2024,FY,USD,Income Statement
+ebitda,130073000000,2024,FY,USD,Income Statement
+total_assets,364980000000,2024,FY,USD,Balance Sheet
+total_liabilities,308030000000,2024,FY,USD,Balance Sheet
+total_equity,56950000000,2024,FY,USD,Balance Sheet
+current_assets,143566000000,2024,FY,USD,Balance Sheet
+current_liabilities,176392000000,2024,FY,USD,Balance Sheet
+operating_cf,118254000000,2024,FY,USD,Cash Flow
+capex,9447000000,2024,FY,USD,Cash Flow
+free_cash_flow,108807000000,2024,FY,USD,Cash Flow

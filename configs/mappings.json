@@ -1,0 +1,97 @@
+{
+  "revenue": "revenue",
+  "sales": "revenue",
+  "net sales": "revenue",
+  "total revenues": "revenue",
+  "operating revenues": "revenue",
+  "net revenues": "revenue",
+  "total revenue": "revenue",
+
+  "cost of goods sold": "cost_of_goods_sold",
+  "cost of sales": "cost_of_goods_sold",
+  "cost of revenue": "cost_of_goods_sold",
+  "cogs": "cost_of_goods_sold",
+
+  "gross profit": "gross_profit",
+
+  "operating income": "operating_income",
+  "operating profit": "operating_income",
+  "ebit": "operating_income",
+  "income from operations": "operating_income",
+  "operating earnings": "operating_income",
+
+  "net income": "net_income",
+  "net profit": "net_income",
+  "earnings": "net_income",
+  "net earnings": "net_income",
+  "profit for the year": "net_income",
+  "net income attributable to common shareholders": "net_income",
+
+  "ebitda": "ebitda",
+
+  "total assets": "total_assets",
+  "assets": "total_assets",
+
+  "total liabilities": "total_liabilities",
+  "liabilities": "total_liabilities",
+
+  "total equity": "total_equity",
+  "shareholders equity": "total_equity",
+  "stockholders equity": "total_equity",
+  "total stockholders equity": "total_equity",
+  "shareholders funds": "total_equity",
+
+  "current assets": "current_assets",
+  "current liabilities": "current_liabilities",
+
+  "cash and cash equivalents": "cash",
+  "cash": "cash",
+  "cash and equivalents": "cash",
+
+  "total debt": "total_debt",
+  "long-term debt": "long_term_debt",
+  "long term debt": "long_term_debt",
+
+  "operating cash flow": "operating_cf",
+  "net cash provided by operating activities": "operating_cf",
+  "cash from operations": "operating_cf",
+  "cash flows from operations": "operating_cf",
+
+  "capital expenditures": "capex",
+  "capex": "capex",
+  "purchases of property plant and equipment": "capex",
+
+  "free cash flow": "free_cash_flow",
+
+  "depreciation and amortization": "depreciation_amortization",
+  "d&a": "depreciation_amortization",
+  "depreciation": "depreciation_amortization",
+
+  "interest expense": "interest_expense",
+  "net interest expense": "interest_expense",
+
+  "income tax expense": "tax_expense",
+  "provision for income taxes": "tax_expense",
+  "taxes": "tax_expense",
+
+  "research and development": "r_and_d",
+  "r&d expense": "r_and_d",
+  "research and development expense": "r_and_d",
+
+  "selling general and administrative": "sg_and_a",
+  "sg&a": "sg_and_a",
+  "selling general administrative": "sg_and_a",
+
+  "open_price": "open_price",
+  "open": "open_price",
+  "high_price": "high_price",
+  "high": "high_price",
+  "low_price": "low_price",
+  "low": "low_price",
+  "close_price": "close_price",
+  "close": "close_price",
+  "adj close": "close_price",
+  "adjusted close": "close_price",
+  "trading_volume": "trading_volume",
+  "volume": "trading_volume"
+}

@@ -1,0 +1,26 @@
+metric_key,value,fiscal_year,fiscal_period,currency,section,date
+open_price,200.8333,2025,FY,USD,Market Data,2025-06-23
+high_price,201.5006,2025,FY,USD,Market Data,2025-06-23
+low_price,198.1738,2025,FY,USD,Market Data,2025-06-23
+close_price,200.7038,2025,FY,USD,Market Data,2025-06-23
+trading_volume,55814300,2025,FY,USD,Market Data,2025-06-23
+open_price,201.7895,2025,FY,USD,Market Data,2025-06-24
+high_price,202.6361,2025,FY,USD,Market Data,2025-06-24
+low_price,199.4089,2025,FY,USD,Market Data,2025-06-24
+close_price,199.5085,2025,FY,USD,Market Data,2025-06-24
+trading_volume,54064000,2025,FY,USD,Market Data,2025-06-24
+open_price,200.654,2025,FY,USD,Market Data,2025-06-25
+high_price,202.8652,2025,FY,USD,Market Data,2025-06-25
+low_price,199.8272,2025,FY,USD,Market Data,2025-06-25
+close_price,200.7635,2025,FY,USD,Market Data,2025-06-25
+trading_volume,39525700,2025,FY,USD,Market Data,2025-06-25
+open_price,200.634,2025,FY,USD,Market Data,2025-06-26
+high_price,201.8393,2025,FY,USD,Market Data,2025-06-26
+low_price,198.6718,2025,FY,USD,Market Data,2025-06-26
+close_price,200.2057,2025,FY,USD,Market Data,2025-06-26
+trading_volume,50799100,2025,FY,USD,Market Data,2025-06-26
+open_price,201.0922,2025,FY,USD,Market Data,2025-06-27
+high_price,202.417,2025,FY,USD,Market Data,2025-06-27
+low_price,199.2097,2025,FY,USD,Market Data,2025-06-27
+close_price,200.2854,2025,FY,USD,Market Data,2025-06-27
+trading_volume,73188600,2025,FY,USD,Market Data,2025-06-27
