@@ -59,6 +59,7 @@ function switchTab(name) {
 
   const titles = {
     workspace: ['Workspace', 'Unified Analysis Command Center'],
+    exec: ['Executive Dashboard', 'Multi-Company Comparative Analytics & Benchmarking'],
     companies: ['Portfolio', 'Manage tracked financial entities'],
     audit: ['Audit Trail', 'Immutable event history'],
   };
@@ -67,6 +68,7 @@ function switchTab(name) {
   document.getElementById('page-subtitle').textContent = s;
 
   if (name === 'audit') loadAuditPreview();
+  if (name === 'exec') loadExecutiveDashboard();
 }
 
 // ============================================================
@@ -885,17 +887,6 @@ async function loadAuditPreview() {
   }
 }
 
-// ============================================================
-// ALERTS & TOASTS
-// ============================================================
-function showAlert(id, msg, type = 'error') {
-  const el = document.getElementById(id);
-  el.className = `alert alert-${type}`;
-  el.textContent = msg;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 5000);
-}
-
 function toast(msg, type = 'success') {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
@@ -904,3 +895,449 @@ function toast(msg, type = 'success') {
   container.appendChild(el);
   setTimeout(() => el.remove(), 4000);
 }
+
+// ============================================================
+// EXECUTIVE DASHBOARD & COMPARATIVE ANALYTICS (Phase 4A)
+// ============================================================
+
+let _radarChart = null;
+let _trendChart = null;
+let _lastComparisonData = null;
+
+async function loadExecutiveDashboard() {
+  renderCohortCheckboxes();
+  await loadSavedCohorts();
+  await loadAnalystNotes();
+}
+
+function renderCohortCheckboxes() {
+  const wrap = document.getElementById('cohort-checkboxes');
+  if (!_companies || !_companies.length) {
+    wrap.innerHTML = '<div class="empty-state">No companies registered yet. Add companies in Portfolio first.</div>';
+    return;
+  }
+  wrap.innerHTML = _companies.map(c => `
+    <label class="cohort-chip-label">
+      <input type="checkbox" name="cohort-company" value="${c.id}" />
+      <strong>${c.ticker}</strong> (${c.name})
+    </label>
+  `).join('');
+}
+
+async function runCohortComparison() {
+  const selectedCheckboxes = document.querySelectorAll('input[name="cohort-company"]:checked');
+  const companyIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+  if (companyIds.length < 1) {
+    toast('Select at least 1 company to compare.', 'error');
+    return;
+  }
+
+  const year = parseInt(document.getElementById('exec-year').value) || 2024;
+  const period = document.getElementById('exec-period').value || 'FY';
+  const btn = document.getElementById('btn-run-cohort');
+  btn.disabled = true;
+  btn.textContent = 'Comparing Cohort...';
+
+  try {
+    const res = await fetch(`${API}/comparison/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_ids: companyIds, fiscal_year: year, fiscal_period: period }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.detail || 'Cohort comparison failed.', 'error');
+      return;
+    }
+
+    _lastComparisonData = data;
+    renderExecutiveHealthCards(data.executive_healths);
+    renderComparisonMatrix(data.metric_stats, data.company_tickers);
+    renderRadarChart(data.executive_healths);
+    await fetchAndRenderTrends(companyIds, year);
+
+    // Show sections
+    document.getElementById('exec-health-cards').classList.remove('hidden');
+    document.getElementById('exec-matrix-card').classList.remove('hidden');
+    document.getElementById('exec-charts-grid').classList.remove('hidden');
+    document.getElementById('exec-workspace-grid').classList.remove('hidden');
+
+    toast(`Calculated comparison for ${companyIds.length} company cohort`, 'success');
+  } catch (err) {
+    toast('Network error during cohort comparison.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📊 Compare Selected Cohort';
+  }
+}
+
+function renderExecutiveHealthCards(healths) {
+  const container = document.getElementById('exec-health-cards');
+  const items = Object.values(healths);
+  if (!items.length) { container.classList.add('hidden'); return; }
+
+  container.innerHTML = items.map(h => {
+    const ratingLower = h.rating.toLowerCase();
+    const trafficLightClass = `traffic-${h.traffic_light}`;
+    return `
+      <div class="exec-card">
+        <div class="exec-card-header">
+          <div>
+            <div class="exec-card-ticker">${h.ticker}</div>
+            <div style="font-size:11px; color:var(--text-muted);">${h.company_name}</div>
+          </div>
+          <span class="rating-badge rating-${ratingLower}">${h.rating}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;">
+          <div>
+            <span class="traffic-light-dot ${trafficLightClass}"></span>
+            <span style="font-size:11px; text-transform:uppercase; color:var(--text-secondary);">${h.traffic_light}</span>
+          </div>
+          <div class="exec-card-score">${h.overall_score.toFixed(0)}<span style="font-size:14px; color:var(--text-muted);">/100</span></div>
+        </div>
+        ${h.strengths && h.strengths.length ? `
+          <div style="margin-bottom:6px;">
+            <div style="font-size:9px; font-weight:700; color:var(--accent-green); text-transform:uppercase;">Top Strengths</div>
+            <div style="font-size:10px; color:var(--text-secondary);">${h.strengths.join('<br>')}</div>
+          </div>
+        ` : ''}
+        ${h.vulnerabilities && h.vulnerabilities.length ? `
+          <div>
+            <div style="font-size:9px; font-weight:700; color:var(--accent-red); text-transform:uppercase;">Vulnerabilities</div>
+            <div style="font-size:10px; color:var(--text-secondary);">${h.vulnerabilities.join('<br>')}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderComparisonMatrix(metricStats, companyTickers) {
+  const wrap = document.getElementById('exec-matrix-wrap');
+  const keys = Object.keys(metricStats);
+  const companyIds = Object.keys(companyTickers);
+
+  if (!keys.length || !companyIds.length) {
+    wrap.innerHTML = '<div class="empty-state">No comparison data.</div>';
+    return;
+  }
+
+  let html = `
+    <table class="data-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Metric</th>
+          ${companyIds.map(cid => `<th style="text-align:right;">${companyTickers[cid]}</th>`).join('')}
+          <th style="text-align:right; border-left:1px solid var(--border);">Cohort Avg</th>
+          <th style="text-align:right;">Median</th>
+          <th style="text-align:right;">Min</th>
+          <th style="text-align:right;">Max</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  for (const k of keys) {
+    const stat = metricStats[k];
+    html += `
+      <tr>
+        <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
+          <strong>${stat.name}</strong><br>
+          <span style="font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono';">${stat.category.toUpperCase()}</span>
+        </td>
+    `;
+
+    for (const cid of companyIds) {
+      const val = stat.company_values[cid];
+      const zScore = stat.z_scores[cid] || 0.0;
+      let heatmapClass = 'heatmap-cell neutral';
+      if (zScore >= 1.0) heatmapClass = 'heatmap-cell high-pos';
+      else if (zScore >= 0.3) heatmapClass = 'heatmap-cell mod-pos';
+      else if (zScore <= -1.0) heatmapClass = 'heatmap-cell high-neg';
+      else if (zScore <= -0.3) heatmapClass = 'heatmap-cell mod-neg';
+
+      const formattedVal = val !== undefined ? formatMetricValue(k, val, stat.unit) : 'N/A';
+      html += `<td style="text-align:right; border-bottom:1px solid var(--border);" class="${heatmapClass}">
+        ${formattedVal}<br><span style="font-size:9px; font-weight:normal; opacity:0.8;">Z: ${zScore > 0 ? '+' : ''}${zScore.toFixed(2)}</span>
+      </td>`;
+    }
+
+    html += `
+        <td style="text-align:right; border-bottom:1px solid var(--border); border-left:1px solid var(--border); font-weight:600;">${formatMetricValue(k, stat.mean, stat.unit)}</td>
+        <td style="text-align:right; border-bottom:1px solid var(--border); color:var(--text-secondary);">${formatMetricValue(k, stat.median, stat.unit)}</td>
+        <td style="text-align:right; border-bottom:1px solid var(--border); color:var(--text-muted);">${formatMetricValue(k, stat.min_value, stat.unit)}</td>
+        <td style="text-align:right; border-bottom:1px solid var(--border); color:var(--text-muted);">${formatMetricValue(k, stat.max_value, stat.unit)}</td>
+      </tr>
+    `;
+  }
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderRadarChart(healths) {
+  const items = Object.values(healths);
+  if (!items.length) return;
+
+  const ctx = document.getElementById('radar-chart').getContext('2d');
+  if (_radarChart) _radarChart.destroy();
+
+  const categories = ['profitability', 'liquidity', 'leverage', 'cash_flow'];
+  const categoryLabels = ['Profitability', 'Liquidity', 'Leverage', 'Cash Flow'];
+
+  const datasets = items.map((h, idx) => {
+    const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+    const color = colors[idx % colors.length];
+
+    const catScores = categories.map(cat => {
+      const catHealths = h.metric_healths.filter(m => m.category === cat);
+      if (!catHealths.length) return 50;
+      return catHealths.reduce((acc, curr) => acc + curr.score, 0) / catHealths.length;
+    });
+
+    return {
+      label: h.ticker,
+      data: catScores,
+      borderColor: color,
+      backgroundColor: color + '33', // 20% alpha
+      borderWidth: 2,
+    };
+  });
+
+  _radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: { labels: categoryLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { color: '#71717a', backdropColor: 'transparent' },
+          grid: { color: '#27272a' },
+          angleLines: { color: '#3f3f46' },
+          pointLabels: { color: '#a1a1aa', font: { family: 'Inter', size: 11, weight: 'bold' } },
+        },
+      },
+      plugins: { legend: { labels: { color: '#fafafa', font: { family: 'JetBrains Mono' } } } },
+    },
+  });
+}
+
+let _lastTrendData = null;
+
+async function fetchAndRenderTrends(companyIds, endYear) {
+  try {
+    const res = await fetch(`${API}/comparison/trends`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_ids: companyIds, start_year: endYear - 4, end_year: endYear }),
+    });
+    if (res.ok) {
+      _lastTrendData = await res.json();
+      updateTrendChart();
+    }
+  } catch (err) {
+    console.warn('Failed to fetch trend data:', err);
+  }
+}
+
+function updateTrendChart() {
+  if (!_lastTrendData || !_lastTrendData.company_trends) return;
+  const metricKey = document.getElementById('trend-metric-select').value;
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  if (_trendChart) _trendChart.destroy();
+
+  const companies = Object.values(_lastTrendData.company_trends);
+  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+
+  let allYearsSet = new Set();
+  companies.forEach(c => {
+    const t = c.trends[metricKey];
+    if (t && t.time_series) {
+      t.time_series.forEach(point => allYearsSet.add(point.year));
+    }
+  });
+
+  const years = Array.from(allYearsSet).sort();
+
+  const datasets = companies.map((c, idx) => {
+    const t = c.trends[metricKey];
+    const color = colors[idx % colors.length];
+    const seriesMap = (t && t.time_series) ? Object.fromEntries(t.time_series.map(p => [p.year, p.value])) : {};
+    const data = years.map(yr => seriesMap[yr] !== undefined ? seriesMap[yr] : null);
+
+    const cagrLabel = (t && t.cagr) ? ` (CAGR: ${(t.cagr * 100).toFixed(1)}%)` : '';
+
+    return {
+      label: `${c.ticker}${cagrLabel}`,
+      data,
+      borderColor: color,
+      backgroundColor: color,
+      tension: 0.2,
+      spanGaps: true,
+    };
+  });
+
+  _trendChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#fafafa', font: { family: 'JetBrains Mono' } } } },
+      scales: {
+        x: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono' } } },
+        y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono' } } },
+      },
+    },
+  });
+}
+
+// --- Saved Cohorts & Notes ---
+
+async function loadSavedCohorts() {
+  const el = document.getElementById('saved-cohorts-list');
+  try {
+    const res = await fetch(`${API}/workspace/comparisons`);
+    const list = await res.json();
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state">No saved cohorts.</div>';
+      return;
+    }
+    el.innerHTML = list.map(c => `
+      <div class="note-card" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div class="note-card-title">${c.name}</div>
+          <div class="note-card-meta">${c.company_ids.length} companies | ${c.fiscal_period}${c.fiscal_year || 2024}</div>
+        </div>
+        <div>
+          <button class="btn btn-secondary" onclick="loadCohortFromSaved('${c.id}')" style="padding:2px 6px; font-size:10px;">Load</button>
+          <button class="btn btn-secondary" onclick="deleteSavedCohort('${c.id}')" style="padding:2px 6px; font-size:10px; color:var(--accent-red);">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Failed to load saved cohorts.</div>';
+  }
+}
+
+async function saveCurrentCohort() {
+  const selectedCheckboxes = document.querySelectorAll('input[name="cohort-company"]:checked');
+  const companyIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+  if (!companyIds.length) { toast('Select companies first.', 'error'); return; }
+
+  const name = prompt('Enter a name for this cohort:', `Cohort ${new Date().toLocaleDateString()}`);
+  if (!name) return;
+
+  const year = parseInt(document.getElementById('exec-year').value) || 2024;
+  const period = document.getElementById('exec-period').value || 'FY';
+
+  try {
+    const res = await fetch(`${API}/workspace/comparisons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, company_ids: companyIds, fiscal_year: year, fiscal_period: period }),
+    });
+    if (res.ok) {
+      toast('Cohort Saved', 'success');
+      await loadSavedCohorts();
+    }
+  } catch {
+    toast('Failed to save cohort.', 'error');
+  }
+}
+
+async function deleteSavedCohort(id) {
+  try {
+    await fetch(`${API}/workspace/comparisons/${id}`, { method: 'DELETE' });
+    toast('Cohort deleted', 'success');
+    await loadSavedCohorts();
+  } catch {
+    toast('Delete failed.', 'error');
+  }
+}
+
+async function loadAnalystNotes() {
+  const el = document.getElementById('analyst-notes-list');
+  try {
+    const res = await fetch(`${API}/workspace/notes`);
+    const notes = await res.json();
+    if (!notes.length) {
+      el.innerHTML = '<div class="empty-state">No analyst decision notes recorded yet.</div>';
+      return;
+    }
+    el.innerHTML = notes.map(n => `
+      <div class="note-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="note-card-title">${n.title}</div>
+          <button class="btn btn-secondary" onclick="deleteAnalystNote('${n.id}')" style="padding:2px 4px; font-size:9px; color:var(--accent-red);">Remove</button>
+        </div>
+        <div style="color:var(--text-secondary); margin:4px 0; font-size:11px; white-space:pre-wrap;">${n.content}</div>
+        <div class="note-card-meta">${new Date(n.created_at).toLocaleString()} | Author: ${n.author}</div>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Failed to load analyst notes.</div>';
+  }
+}
+
+async function handleCreateNote(e) {
+  e.preventDefault();
+  const title = document.getElementById('note-title').value.trim();
+  const content = document.getElementById('note-content').value.trim();
+  if (!title || !content) return;
+
+  try {
+    const res = await fetch(`${API}/workspace/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content }),
+    });
+    if (res.ok) {
+      toast('Decision note recorded', 'success');
+      document.getElementById('note-title').value = '';
+      document.getElementById('note-content').value = '';
+      await loadAnalystNotes();
+    }
+  } catch {
+    toast('Failed to create note.', 'error');
+  }
+}
+
+async function deleteAnalystNote(id) {
+  try {
+    await fetch(`${API}/workspace/notes/${id}`, { method: 'DELETE' });
+    toast('Note deleted', 'success');
+    await loadAnalystNotes();
+  } catch {
+    toast('Delete failed.', 'error');
+  }
+}
+
+function exportComparisonCSV() {
+  if (!_lastComparisonData || !_lastComparisonData.metric_stats) {
+    toast('Run a comparison first.', 'error'); return;
+  }
+  const stats = _lastComparisonData.metric_stats;
+  const tickers = _lastComparisonData.company_tickers;
+  const companyIds = Object.keys(tickers);
+
+  let csv = `Metric,Category,Unit,${companyIds.map(cid => tickers[cid]).join(',')},Cohort Mean,Cohort Median,Min,Max\n`;
+  for (const k of Object.keys(stats)) {
+    const s = stats[k];
+    const vals = companyIds.map(cid => s.company_values[cid] !== undefined ? s.company_values[cid] : '').join(',');
+    csv += `"${s.name}","${s.category}","${s.unit}",${vals},${s.mean},${s.median},${s.min_value},${s.max_value}\n`;
+  }
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cohort_comparison_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV Exported', 'success');
+}
+

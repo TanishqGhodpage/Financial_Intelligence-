@@ -273,3 +273,63 @@ select option { background: var(--bg-elevated); }
   border: 1px solid var(--border); color: var(--text-secondary);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* ----------------------------------------------------------------
+   Executive Dashboard & Comparative Analytics (Phase 4A)
+   ---------------------------------------------------------------- */
+.grid-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;
+}
+
+.exec-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  padding: 16px; position: relative; overflow: hidden;
+}
+.exec-card-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+.exec-card-ticker {
+  font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--text-primary);
+}
+.exec-card-score {
+  font-size: 28px; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1;
+}
+
+.rating-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 2px; text-transform: uppercase;
+}
+.rating-aaa, .rating-aa, .rating-a { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+.rating-bbb, .rating-bb, .rating-b { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+.rating-ccc, .rating-cc, .rating-c, .rating-d { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+.traffic-light-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+}
+.traffic-green { background: var(--accent-green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+.traffic-yellow { background: var(--accent-amber); box-shadow: 0 0 6px rgba(245,158,11,0.6); }
+.traffic-red { background: var(--accent-red); box-shadow: 0 0 6px rgba(239,68,68,0.6); }
+
+.heatmap-cell { font-weight: 600; }
+.heatmap-cell.high-pos { background: rgba(34,197,94,0.25); color: #86efac; }
+.heatmap-cell.mod-pos  { background: rgba(34,197,94,0.12); color: #bbf7d0; }
+.heatmap-cell.neutral  { background: transparent; }
+.heatmap-cell.mod-neg  { background: rgba(239,68,68,0.12); color: #fecaca; }
+.heatmap-cell.high-neg { background: rgba(239,68,68,0.25); color: #fca5a5; }
+
+.cohort-chip-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  padding: 6px 12px; border-radius: var(--radius); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+.cohort-chip-label:hover { border-color: var(--accent); }
+.cohort-chip-label input[type="checkbox"] { cursor: pointer; }
+
+.note-card {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  padding: 10px 12px; margin-bottom: 8px; font-size: 12px;
+}
+.note-card-title { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.note-card-meta { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+

@@ -241,3 +241,44 @@ class AuditLog:
     old_state: dict[str, Any] | None = None
     new_state: dict[str, Any] | None = None
     timestamp: datetime = field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Decision Workspace Entities (Phase 4A)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SavedComparison:
+    """Represents a saved cohort comparison configuration."""
+    id: str = field(default_factory=_new_id)
+    name: str = ""
+    company_ids: list[str] = field(default_factory=list)
+    fiscal_year: int | None = None
+    fiscal_period: str = "FY"
+    created_at: datetime = field(default_factory=_now)
+
+
+@dataclass
+class AnalystNote:
+    """Represents an analyst decision note attached to a company or comparison."""
+    id: str = field(default_factory=_new_id)
+    company_id: str | None = None
+    author: str = "analyst"
+    title: str = ""
+    content: str = ""
+    tags: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=_now)
+    updated_at: datetime = field(default_factory=_now)
+
+
+@dataclass
+class WorkspaceState:
+    """Represents the persisted UI state of an analyst session."""
+    id: str = field(default_factory=_new_id)
+    user_id: str = "default_user"
+    selected_company_ids: list[str] = field(default_factory=list)
+    active_filters: dict[str, Any] = field(default_factory=dict)
+    bookmarks: list[str] = field(default_factory=list)
+    layout_config: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime = field(default_factory=_now)
+

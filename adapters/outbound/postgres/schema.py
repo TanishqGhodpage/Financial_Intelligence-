@@ -202,3 +202,44 @@ class ReportORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     company: Mapped["CompanyORM"] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# Decision Workspace Persistence (Phase 4A)
+# ---------------------------------------------------------------------------
+
+class SavedComparisonORM(Base):
+    __tablename__ = "saved_comparisons"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    company_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    fiscal_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    fiscal_period: Mapped[Optional[str]] = mapped_column(String(10), default="FY")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AnalystNoteORM(Base):
+    __tablename__ = "analyst_notes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    author: Mapped[str] = mapped_column(String(100), default="analyst")
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class WorkspaceStateORM(Base):
+    __tablename__ = "workspace_states"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(100), default="default_user", unique=True, index=True)
+    selected_company_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    active_filters: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    bookmarks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    layout_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+

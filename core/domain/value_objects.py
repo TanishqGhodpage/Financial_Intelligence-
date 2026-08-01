@@ -224,3 +224,61 @@ class CalculationTrace:
     calculation_strategy: str = "deterministic"
     configuration_version: str = "2026.08"
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+# ---------------------------------------------------------------------------
+# Executive Dashboard & Comparative Analytics Value Objects (Phase 4A)
+# ---------------------------------------------------------------------------
+
+class TrafficLight(str, Enum):
+    GREEN = "green"
+    YELLOW = "yellow"
+    RED = "red"
+
+
+class HealthRating(str, Enum):
+    AAA = "AAA"
+    AA = "AA"
+    A = "A"
+    BBB = "BBB"
+    BB = "BB"
+    B = "B"
+    CCC = "CCC"
+    CC = "CC"
+    C = "C"
+    D = "D"
+
+
+class TrendDirection(str, Enum):
+    UPWARD = "upward"
+    DOWNWARD = "downward"
+    FLAT = "flat"
+    VOLATILE = "volatile"
+
+
+@dataclass(frozen=True)
+class MetricHealth:
+    metric_key: str
+    name: str
+    category: str
+    value: float
+    unit: str
+    score: float                      # 0.0 to 100.0
+    traffic_light: TrafficLight
+    rating: HealthRating
+    percentile: float                 # 0.0 to 100.0
+    z_score: float
+
+
+@dataclass(frozen=True)
+class CompanyHealthSummary:
+    company_id: str
+    ticker: str
+    company_name: str
+    overall_score: float              # 0.0 to 100.0
+    rating: HealthRating
+    traffic_light: TrafficLight
+    metric_healths: list[MetricHealth]
+    strengths: list[str]              # Top 3 strong metrics
+    vulnerabilities: list[str]        # Top 3 vulnerable metrics
+
