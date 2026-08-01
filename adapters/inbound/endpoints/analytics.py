@@ -44,12 +44,27 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 class MetricOut(BaseModel):
+    """Full explainability response for a single calculated metric."""
     key: str
     name: str | None = None
+    category: str | None = None
     value: float
-    confidence: float
-    formula: str
-    inputs_used: dict[str, float]
+    unit: str = "absolute"
+    currency: str = "USD"
+    fiscal_period_label: str | None = None
+    confidence: float = 0.0
+    status: str = "success"
+    description: str = ""
+    formula_display: str = ""
+    formula_version: str = "v1"
+    engine_version: str = "v2.0"
+    configuration_version: str = "2026.08"
+    calculation_strategy: str = "deterministic"
+    calculation_timestamp: str | None = None
+    inputs_used: dict[str, float] = {}
+    validation_messages: list[str] = []
+    references: list[dict[str, str]] = []
+    data_lineage: list[str] = ["RawMetric", "NormalizedMetric", "CalculatedMetric"]
 
 
 class AnalyticsResponse(BaseModel):
@@ -173,17 +188,28 @@ async def run_analytics(
             formula_description=res.trace.formula_version,
         )
         db.add(calc_orm)
-        metric_def = metric_registry.get_metric(res.key)
-        metric_name = metric_def.name if metric_def else None
 
         metric_out_list.append(
             MetricOut(
                 key=res.key,
-                name=metric_name,
+                name=res.name,
+                category=res.category,
                 value=round(res.value, 6),
+                unit=res.unit,
+                currency=context.currency.code,
+                fiscal_period_label=fp.label if fp else None,
                 confidence=round(res.confidence.value, 4),
-                formula=res.trace.formula_version,
+                status=res.status.value,
+                description=res.description,
+                formula_display=res.formula_display,
+                formula_version=res.trace.formula_version,
+                engine_version=res.trace.engine_version,
+                configuration_version=res.trace.configuration_version,
+                calculation_strategy=res.trace.calculation_strategy,
+                calculation_timestamp=res.trace.timestamp,
                 inputs_used=res.trace.inputs_used,
+                validation_messages=res.validation_messages,
+                references=res.references,
             )
         )
 
@@ -253,7 +279,7 @@ async def run_dcf(
 
 
 @router.get("/{company_id}/metrics/available")
-async def list_available_metrics() -> dict:
+async def list_available_metrics(company_id: str) -> dict:
     """Returns metadata about all registered metrics in the system."""
     return {"metrics": metric_registry.list_metrics()}
 
@@ -340,12 +366,24 @@ async def auto_run_analysis(
         results = engine.calculate_all(context=context, inputs=inputs, confidences=confidences)
         metrics_list = []
         for res in results:
-            metric_def = metric_registry.get_metric(res.key)
             metrics_list.append({
                 "key": res.key,
-                "name": metric_def.name if metric_def else None,
+                "name": res.name,
+                "category": res.category,
                 "value": res.value,
-                "formula": res.trace.formula_version
+                "unit": res.unit,
+                "confidence": round(res.confidence.value, 4),
+                "status": res.status.value,
+                "description": res.description,
+                "formula_display": res.formula_display,
+                "formula_version": res.trace.formula_version,
+                "engine_version": res.trace.engine_version,
+                "configuration_version": res.trace.configuration_version,
+                "calculation_strategy": res.trace.calculation_strategy,
+                "calculation_timestamp": res.trace.timestamp,
+                "inputs_used": res.trace.inputs_used,
+                "validation_messages": res.validation_messages,
+                "references": res.references,
             })
         report_data_years[str(year)] = {
             "metrics": metrics_list,

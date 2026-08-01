@@ -139,7 +139,7 @@ async function createCompany(e) {
       showAlert('company-alert', `Added ${data.name} successfully.`, 'success');
       document.getElementById('company-form').reset();
       await loadCompanies();
-      toast(`✓ ${data.ticker} added to portfolio`, 'success');
+      toast(`Added ${data.ticker} to portfolio`, 'success');
     }
   } catch (err) {
     showAlert('company-alert', 'Network error. Is the API server running?', 'error');
@@ -217,7 +217,7 @@ async function uploadDocument(e) {
       if (data.jobs) {
         data.jobs.forEach(j => _jobs.push(j));
       }
-      toast(`✓ ${data.files_processed} file(s) ingested`, 'success');
+      toast(`${data.files_processed} file(s) ingested`, 'success');
     }
   } catch (err) {
     toast('Network error.', 'error');
@@ -279,7 +279,7 @@ async function fetchMarketData() {
         </div>
       `;
       _jobs.push(data);
-      toast(`✓ Fetched market data for ${company.ticker}`, 'success');
+      toast(`Fetched market data for ${company.ticker}`, 'success');
     }
   } catch (err) {
     toast('Network error.', 'error');
@@ -294,7 +294,7 @@ async function fetchMarketData() {
 // ============================================================
 async function runAnalytics() {
   const companyId = document.getElementById('w-company').value;
-  const year = document.getElementById('w-year').value;
+  const year = document.getElementById('w-start-year').value;
   const period = document.getElementById('w-period').value;
 
   const btn = document.getElementById('analyze-btn');
@@ -324,31 +324,198 @@ async function runAnalytics() {
   }
 }
 
+// ============================================================
+// GENERIC EXPLAINABILITY PANEL
+// ============================================================
+
+/**
+ * Renders a structured explainability panel for ANY metric.
+ * Driven entirely by the CalculationResult metadata — no per-metric custom code.
+ */
+function renderExplainabilityPanel(m) {
+  const id = `explain-${m.key}-${Math.random().toString(36).substr(2, 6)}`;
+
+  // --- Inputs Grid ---
+  let inputsHtml = '';
+  if (m.inputs_used && Object.keys(m.inputs_used).length) {
+    inputsHtml = `<div class="explain-inputs-grid">
+      ${Object.entries(m.inputs_used).map(([k, v]) =>
+        `<span class="input-key">${k.replace(/_/g, ' ')}</span><span class="input-val">${formatNumber(v)} ${m.currency || 'USD'}</span>`
+      ).join('')}
+    </div>`;
+  }
+
+  // --- Lineage ---
+  const lineage = m.data_lineage || ['RawMetric', 'NormalizedMetric', 'CalculatedMetric'];
+  const lineageHtml = `<div class="lineage-flow">
+    ${lineage.map((step, i) =>
+      `<span class="lineage-step">${step}</span>${i < lineage.length - 1 ? '<span class="lineage-arrow">&#x2192;</span>' : ''}`
+    ).join('')}
+  </div>`;
+
+  // --- References ---
+  let refsHtml = '';
+  if (m.references && m.references.length) {
+    refsHtml = `<div class="explain-refs">
+      ${m.references.map(r => `<span class="explain-ref-chip">${r.source || r.Type || ''}${r.title ? ': ' + r.title : ''}</span>`).join('')}
+    </div>`;
+  }
+
+  // --- Validation ---
+  let validationHtml = '';
+  if (m.validation_messages && m.validation_messages.length) {
+    validationHtml = m.validation_messages.map(msg =>
+      `<div style="color: var(--accent-amber); font-size: 11px;">${msg}</div>`
+    ).join('');
+  }
+
+  return `
+    <button class="explain-toggle" onclick="toggleExplain('${id}')">&#x25B6; View Calculation</button>
+    <div id="${id}" class="explainability-panel">
+
+      <div class="explain-section">
+        <div class="explain-section-title">Business Definition</div>
+        <div style="color: var(--text-secondary); font-size: 11px; line-height: 1.5;">${m.description || 'No description available.'}</div>
+      </div>
+
+      <div class="explain-section">
+        <div class="explain-section-title">Formula</div>
+        <div class="explain-formula-box">${m.formula_display || 'N/A'}</div>
+      </div>
+
+      ${inputsHtml ? `
+      <div class="explain-section">
+        <div class="explain-section-title">Input Values</div>
+        ${inputsHtml}
+      </div>` : ''}
+
+      <div class="explain-section">
+        <div class="explain-section-title">Result</div>
+        <div class="explain-row"><span class="explain-label">Final Value</span><span class="explain-value" style="font-size:14px; font-weight:700;">${formatMetricValue(m.key, m.value, m.unit)}</span></div>
+        <div class="explain-row"><span class="explain-label">Confidence</span><span class="explain-value">${(m.confidence * 100).toFixed(1)}%</span></div>
+        <div class="explain-row"><span class="explain-label">Validation</span><span class="explain-value" style="color:${m.status === 'success' ? 'var(--accent-green)' : 'var(--accent-amber)'}">${m.status === 'success' ? 'Passed' : m.status}</span></div>
+        ${validationHtml}
+      </div>
+
+      <div class="explain-section">
+        <div class="explain-section-title">Engine Metadata</div>
+        <div class="explain-row"><span class="explain-label">Fiscal Period</span><span class="explain-value">${m.fiscal_period_label || 'N/A'}</span></div>
+        <div class="explain-row"><span class="explain-label">Formula Version</span><span class="explain-value">${m.formula_version || m.formula || 'v1'}</span></div>
+        <div class="explain-row"><span class="explain-label">Engine Version</span><span class="explain-value">${m.engine_version || 'v2.0'}</span></div>
+        <div class="explain-row"><span class="explain-label">Config Version</span><span class="explain-value">${m.configuration_version || '2026.08'}</span></div>
+        <div class="explain-row"><span class="explain-label">Strategy</span><span class="explain-value">${m.calculation_strategy || 'deterministic'}</span></div>
+        <div class="explain-row"><span class="explain-label">Timestamp</span><span class="explain-value">${m.calculation_timestamp ? new Date(m.calculation_timestamp).toLocaleString() : 'N/A'}</span></div>
+      </div>
+
+      <div class="explain-section">
+        <div class="explain-section-title">Data Lineage</div>
+        ${lineageHtml}
+      </div>
+
+      ${refsHtml ? `
+      <div class="explain-section">
+        <div class="explain-section-title">References</div>
+        ${refsHtml}
+      </div>` : ''}
+
+    </div>
+  `;
+}
+
+function toggleExplain(id) {
+  const panel = document.getElementById(id);
+  if (panel) {
+    panel.classList.toggle('open');
+    // Update button text
+    const btn = panel.previousElementSibling;
+    if (btn && btn.classList.contains('explain-toggle')) {
+      btn.innerHTML = panel.classList.contains('open') ? '&#x25BC; Hide Calculation' : '&#x25B6; View Calculation';
+    }
+  }
+}
+
+/**
+ * Renders a single metric card with explainability toggle.
+ * Works for both live analytics results and saved report data.
+ */
+function renderMetricCard(m) {
+  const statusClass = (m.status || 'success').replace(/ /g, '_');
+  const category = m.category || '';
+  return `
+    <div class="metric-card" data-category="${category}">
+      <div class="metric-card-name">${m.name || m.key.replace(/_/g, ' ')}</div>
+      <div class="metric-card-key">${m.key.replace(/_/g, ' ')}</div>
+      <div class="metric-card-value">${formatMetricValue(m.key, m.value, m.unit)}</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span class="metric-card-status ${statusClass}">${m.status || 'success'}</span>
+        <span style="font-size:9px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">${(m.confidence * 100).toFixed(0)}% conf</span>
+      </div>
+      ${renderExplainabilityPanel(m)}
+    </div>
+  `;
+}
+
 function renderAnalyticsResults(data) {
   const grid = document.getElementById('metrics-cards');
-  grid.innerHTML = data.metrics.map(m => `
-    <div class="metric-card">
-      <div class="metric-card-key">${m.key.replace(/_/g,' ')}</div>
-      <div class="metric-card-value">${formatMetricValue(m.key, m.value)}</div>
-      <div class="metric-card-formula">${m.formula}</div>
-    </div>
-  `).join('');
+  
+  // Group metrics by category
+  const categories = {};
+  data.metrics.forEach(m => {
+    const cat = m.category || 'other';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(m);
+  });
 
-  const labels = data.metrics.map(m => m.key.replace(/_/g,' '));
-  const values = data.metrics.map(m => parseFloat((m.value * 100).toFixed(2)));
+  const categoryLabels = {
+    profitability: 'Profitability',
+    liquidity: 'Liquidity',
+    leverage: 'Leverage',
+    cash_flow: 'Cash Flow',
+    other: 'Other',
+  };
+
+  const categoryOrder = ['profitability', 'liquidity', 'leverage', 'cash_flow', 'other'];
+
+  let html = '';
+  for (const cat of categoryOrder) {
+    if (!categories[cat]) continue;
+    html += `<div style="grid-column: 1 / -1; margin-top: 12px; margin-bottom: 4px;">
+      <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);">${categoryLabels[cat] || cat}</span>
+    </div>`;
+    html += categories[cat].map(m => renderMetricCard(m)).join('');
+  }
+
+  grid.innerHTML = html;
+
+  // Chart — only successful metrics
+  const successMetrics = data.metrics.filter(m => m.status === 'success');
+  const labels = successMetrics.map(m => (m.name || m.key).replace(/_/g, ' '));
+  const values = successMetrics.map(m => {
+    if (m.unit === 'percentage') return parseFloat((m.value * 100).toFixed(2));
+    return parseFloat(m.value.toFixed(4));
+  });
   const ctx = document.getElementById('metrics-chart').getContext('2d');
   if (_analyticsChart) _analyticsChart.destroy();
+
+  const barColors = successMetrics.map(m => {
+    if (m.category === 'profitability') return '#22c55e';
+    if (m.category === 'liquidity') return '#3b82f6';
+    if (m.category === 'leverage') return '#f59e0b';
+    if (m.category === 'cash_flow') return '#a855f7';
+    return '#3b82f6';
+  });
+
   _analyticsChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{ label: 'Value (%)', data: values, backgroundColor: '#3b82f6' }]
+      datasets: [{ label: 'Value', data: values, backgroundColor: barColors }]
     },
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: {family: 'JetBrains Mono'} } },
+        x: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: {family: 'JetBrains Mono'}, maxRotation: 45 } },
         y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: {family: 'JetBrains Mono'} } },
       },
     },
@@ -358,11 +525,32 @@ function renderAnalyticsResults(data) {
   toast('Analysis Complete', 'success');
 }
 
-function formatMetricValue(key, value) {
-  if (key.includes('margin') || key.includes('return') || key.includes('ratio')) {
+function formatMetricValue(key, value, unit) {
+  if (unit === 'percentage') {
     return (value * 100).toFixed(2) + '%';
   }
-  return value.toFixed(4);
+  if (unit === 'ratio') {
+    return value.toFixed(4) + 'x';
+  }
+  // Legacy fallback for old data without unit field
+  if (!unit || unit === 'absolute') {
+    if (key && (key.includes('margin') || key.includes('return'))) {
+      return (value * 100).toFixed(2) + '%';
+    }
+    if (key && key.includes('ratio')) {
+      return value.toFixed(4) + 'x';
+    }
+  }
+  return formatNumber(value);
+}
+
+function formatNumber(n) {
+  if (n === undefined || n === null) return 'N/A';
+  if (Math.abs(n) >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+  if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toFixed(4);
 }
 
 // ============================================================
@@ -445,20 +633,15 @@ function viewReport(reportId) {
   
   const data = report.report_data;
   if (data.metrics) {
-    // Old single-year structure
-    metricsGrid.innerHTML = data.metrics.map(m => `
-      <div class="metric-card">
-        <div class="metric-card-key">${m.key.replace(/_/g,' ')}</div>
-        <div class="metric-card-value">${formatMetricValue(m.key, m.value)}</div>
-        <div class="metric-card-formula">${m.formula}</div>
-      </div>
-    `).join('');
+    // Old single-year structure — render with explainability
+    metricsGrid.innerHTML = `<div class="metrics-grid">${data.metrics.map(m => renderMetricCard(m)).join('')}</div>`;
   } else if (data.years) {
-    // New multi-year structure
+    // New multi-year structure — render as a comparison table with expandable details
     const years = Object.keys(data.years).sort();
     if (years.length === 0) {
       metricsGrid.innerHTML = '<div>No data available</div>';
     } else {
+      // Collect all unique metrics across years
       const metricMap = new Map();
       for (const y of years) {
          for (const m of data.years[y].metrics) {
@@ -468,25 +651,63 @@ function viewReport(reportId) {
          }
       }
       const metricsList = Array.from(metricMap.values());
+
+      // Group by category
+      const categoryOrder = ['profitability', 'liquidity', 'leverage', 'cash_flow', 'other'];
+      const categoryLabels = {
+        profitability: 'PROFITABILITY', liquidity: 'LIQUIDITY',
+        leverage: 'LEVERAGE', cash_flow: 'CASH FLOW', other: 'OTHER',
+      };
       
-      let tableHtml = `<table class="table" style="width:100%; border-collapse: collapse;">
+      let tableHtml = `<table class="data-table" style="width:100%;">
         <thead>
           <tr>
-            <th style="text-align: left; padding: 12px; border-bottom: 2px solid var(--border);">Metric</th>`;
+            <th style="text-align: left; padding: 12px;">Metric</th>`;
       for (const y of years) {
-         tableHtml += `<th style="text-align: right; padding: 12px; border-bottom: 2px solid var(--border);">${y}</th>`;
+         tableHtml += `<th style="text-align: right; padding: 12px;">${y}</th>`;
       }
+      tableHtml += `<th style="text-align: center; padding: 12px; width: 40px;">Info</th>`;
       tableHtml += `</tr></thead><tbody>`;
+
+      let currentCat = '';
+      // Sort metrics by category
+      const sortedMetrics = metricsList.sort((a, b) => {
+        const catA = categoryOrder.indexOf(a.category || 'other');
+        const catB = categoryOrder.indexOf(b.category || 'other');
+        return catA - catB;
+      });
       
-      for (const m of metricsList) {
-         tableHtml += `<tr><td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>${m.key.replace(/_/g,' ').toUpperCase()}</strong><br><span style="font-size:10px; color:var(--text-muted);">${m.formula}</span></td>`;
-         for (const y of years) {
-            const yrMetrics = data.years[y].metrics;
-            const found = yrMetrics.find(x => x.key === m.key);
-            const val = found ? formatMetricValue(m.key, found.value) : 'N/A';
-            tableHtml += `<td style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border);">${val}</td>`;
-         }
-         tableHtml += `</tr>`;
+      for (const m of sortedMetrics) {
+        const cat = m.category || 'other';
+        if (cat !== currentCat) {
+          currentCat = cat;
+          tableHtml += `<tr><td colspan="${years.length + 2}" style="padding: 8px 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); border-bottom: 2px solid var(--border); background: var(--bg-base);">${categoryLabels[cat] || cat.toUpperCase()}</td></tr>`;
+        }
+
+        const explainId = `rv-explain-${m.key}-${Math.random().toString(36).substr(2, 6)}`;
+        tableHtml += `<tr>
+          <td style="padding: 12px; border-bottom: 1px solid var(--border);">
+            <strong style="color: var(--text-primary);">${m.name || m.key.replace(/_/g, ' ')}</strong><br>
+            <span style="font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">${m.formula_display || m.formula || ''}</span>
+          </td>`;
+        for (const y of years) {
+          const yrMetrics = data.years[y].metrics;
+          const found = yrMetrics.find(x => x.key === m.key);
+          const val = found ? formatMetricValue(m.key, found.value, found.unit || m.unit) : '<span style="color:var(--text-muted)">N/A</span>';
+          const statusColor = found && found.status === 'success' ? 'var(--text-primary)' : 'var(--text-muted)';
+          tableHtml += `<td style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border); color: ${statusColor}; font-family: 'JetBrains Mono', monospace;">${val}</td>`;
+        }
+        tableHtml += `<td style="text-align: center; padding: 12px; border-bottom: 1px solid var(--border);">
+          <button class="explain-toggle" onclick="toggleExplain('${explainId}')" style="margin:0; padding:2px;">&#x25B6;</button>
+        </td></tr>`;
+        // Inline explainability row
+        const latestYear = years[years.length - 1];
+        const latestMetric = data.years[latestYear].metrics.find(x => x.key === m.key) || m;
+        tableHtml += `<tr><td colspan="${years.length + 2}" style="padding: 0;">
+          <div id="${explainId}" class="explainability-panel" style="border: none; border-bottom: 1px solid var(--border);">
+            ${renderInlineExplainContent(latestMetric)}
+          </div>
+        </td></tr>`;
       }
       tableHtml += `</tbody></table>`;
       metricsGrid.innerHTML = tableHtml;
@@ -495,6 +716,64 @@ function viewReport(reportId) {
 
   viewer.classList.remove('hidden');
   viewer.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Renders inline explainability content (without the wrapper div / toggle).
+ * Used inside the report table rows.
+ */
+function renderInlineExplainContent(m) {
+  let inputsHtml = '';
+  if (m.inputs_used && Object.keys(m.inputs_used).length) {
+    inputsHtml = `<div class="explain-section">
+      <div class="explain-section-title">Input Values</div>
+      <div class="explain-inputs-grid">
+        ${Object.entries(m.inputs_used).map(([k, v]) =>
+          `<span class="input-key">${k.replace(/_/g, ' ')}</span><span class="input-val">${formatNumber(v)}</span>`
+        ).join('')}
+      </div>
+    </div>`;
+  }
+
+  let refsHtml = '';
+  if (m.references && m.references.length) {
+    refsHtml = `<div class="explain-section">
+      <div class="explain-section-title">References</div>
+      <div class="explain-refs">
+        ${m.references.map(r => `<span class="explain-ref-chip">${r.source || ''}${r.title ? ': ' + r.title : ''}</span>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const lineage = m.data_lineage || ['RawMetric', 'NormalizedMetric', 'CalculatedMetric'];
+
+  return `
+    <div class="explain-section">
+      <div class="explain-section-title">Business Definition</div>
+      <div style="color: var(--text-secondary); font-size: 11px;">${m.description || 'N/A'}</div>
+    </div>
+    <div class="explain-section">
+      <div class="explain-section-title">Formula</div>
+      <div class="explain-formula-box">${m.formula_display || 'N/A'}</div>
+    </div>
+    ${inputsHtml}
+    <div class="explain-section">
+      <div class="explain-section-title">Result</div>
+      <div class="explain-row"><span class="explain-label">Confidence</span><span class="explain-value">${((m.confidence || 0) * 100).toFixed(1)}%</span></div>
+      <div class="explain-row"><span class="explain-label">Formula Version</span><span class="explain-value">${m.formula_version || m.formula || 'v1'}</span></div>
+      <div class="explain-row"><span class="explain-label">Engine Version</span><span class="explain-value">${m.engine_version || 'v2.0'}</span></div>
+      <div class="explain-row"><span class="explain-label">Strategy</span><span class="explain-value">${m.calculation_strategy || 'deterministic'}</span></div>
+    </div>
+    <div class="explain-section">
+      <div class="explain-section-title">Data Lineage</div>
+      <div class="lineage-flow">
+        ${lineage.map((step, i) =>
+          `<span class="lineage-step">${step}</span>${i < lineage.length - 1 ? '<span class="lineage-arrow">&#x2192;</span>' : ''}`
+        ).join('')}
+      </div>
+    </div>
+    ${refsHtml}
+  `;
 }
 
 async function runDCF() {

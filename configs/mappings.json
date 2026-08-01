@@ -52,6 +52,16 @@
   "long-term debt": "long_term_debt",
   "long term debt": "long_term_debt",
 
+  "short-term debt": "short_term_debt",
+  "short term debt": "short_term_debt",
+  "current portion of long-term debt": "short_term_debt",
+  "current debt": "short_term_debt",
+  "current portion of long term debt": "short_term_debt",
+
+  "inventory": "inventory",
+  "inventories": "inventory",
+  "merchandise inventories": "inventory",
+
   "operating cash flow": "operating_cf",
   "net cash provided by operating activities": "operating_cf",
   "cash from operations": "operating_cf",

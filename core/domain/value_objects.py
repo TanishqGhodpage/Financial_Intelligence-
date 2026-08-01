@@ -208,6 +208,7 @@ class CalculationContext:
     scenario: str = "base"
     forecast_horizon_years: int = 5
     engine_version: str = "v1.0"
+    configuration_version: str = "2026.08"
 
 
 @dataclass(frozen=True)
@@ -220,4 +221,6 @@ class CalculationTrace:
     author: str
     inputs_used: dict[str, float]
     engine_version: str
+    calculation_strategy: str = "deterministic"
+    configuration_version: str = "2026.08"
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

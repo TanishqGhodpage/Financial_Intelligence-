@@ -46,7 +46,8 @@ async def auto_ingest_financials(company_id: str, ticker: str, start_year: int, 
         "Total Revenue": "revenue",
         "Cost Of Revenue": "cost_of_goods_sold",
         "Operating Income": "operating_income",
-        "Net Income": "net_income"
+        "Net Income": "net_income",
+        "Interest Expense": "interest_expense",
     }
     
     bs_mapping = {
@@ -54,7 +55,16 @@ async def auto_ingest_financials(company_id: str, ticker: str, start_year: int, 
         "Total Liabilities Net Minority Interest": "total_liabilities",
         "Stockholders Equity": "total_equity",
         "Current Assets": "current_assets",
-        "Current Liabilities": "current_liabilities"
+        "Current Liabilities": "current_liabilities",
+        "Current Debt": "short_term_debt",
+        "Long Term Debt": "long_term_debt",
+        "Inventory": "inventory",
+    }
+
+    cf_mapping = {
+        "Operating Cash Flow": "operating_cf",
+        "Capital Expenditure": "capex",
+        "Free Cash Flow": "free_cash_flow",
     }
 
     metrics_to_add = []
@@ -88,6 +98,23 @@ async def auto_ingest_financials(company_id: str, ticker: str, start_year: int, 
             if yf_key in balance_sheet.index:
                 val = balance_sheet.loc[yf_key, bs_date]
                 _add_metric(internal_key, val, bs_year)
+
+    # Process Cash Flow Statement for each valid year
+    try:
+        if fiscal_period == "FY":
+            cashflow = stock.cashflow
+        else:
+            cashflow = stock.quarterly_cashflow
+        if not cashflow.empty:
+            valid_cf_dates = [d for d in cashflow.columns if start_year <= d.year <= end_year]
+            for cf_date in valid_cf_dates:
+                cf_year = cf_date.year
+                for yf_key, internal_key in cf_mapping.items():
+                    if yf_key in cashflow.index:
+                        val = cashflow.loc[yf_key, cf_date]
+                        _add_metric(internal_key, val, cf_year)
+    except Exception as e:
+        logger.warning(f"Cash flow data not available for {ticker}: {e}")
 
     if not metrics_to_add:
         raise ValueError("Could not extract any mapped financial metrics.")
