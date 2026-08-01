@@ -58,7 +58,7 @@ def main():
             metric_key="revenue",
             metric_value=390000000000.0,
             currency=Currency.usd(),
-            fiscal_period=FiscalPeriod(year=2024, period_type=FiscalPeriodType.FY),
+            fiscal_period=FiscalPeriod(year=2024, period_type=FiscalPeriodType.ANNUAL),
             confidence=ConfidenceScore(value=0.90),
             source_citation={"source_authority": SourceAuthority.PRESS_RELEASE.name},
         )
@@ -68,7 +68,7 @@ def main():
             metric_key="revenue",
             metric_value=394328000000.0,
             currency=Currency.usd(),
-            fiscal_period=FiscalPeriod(year=2024, period_type=FiscalPeriodType.FY),
+            fiscal_period=FiscalPeriod(year=2024, period_type=FiscalPeriodType.ANNUAL),
             confidence=ConfidenceScore(value=1.0),
             source_citation={"source_authority": SourceAuthority.SEC_FILING.name},
         )
