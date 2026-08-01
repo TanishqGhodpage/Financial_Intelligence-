@@ -38,6 +38,8 @@ from core.services.validation.rules import RuleValidator
 # Import parsers so they self-register
 import core.services.ingestion.csv_parser  # noqa: F401
 import core.services.ingestion.xlsx_parser  # noqa: F401
+import core.services.ingestion.pdf_parser  # noqa: F401
+import core.services.ingestion.ocr_parser  # noqa: F401
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,6 +49,10 @@ MIME_TYPE_MAP: dict[str, str] = {
     ".csv": "text/csv",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".xls": "application/vnd.ms-excel",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
 }
 
 AUTHORITY_MAP: dict[str, SourceAuthority] = {
@@ -121,6 +127,46 @@ async def _run_ingestion_pipeline(
             document_id=document_id,
             source_authority=source_authority,
         )
+
+        # ---- CONFLICT RESOLUTION ----
+        from core.services.ingestion.conflict_resolver import ConflictResolver
+        # Fetch existing metrics for this company
+        ex_result = await db.execute(
+            select(NormalizedMetricORM).where(NormalizedMetricORM.company_id == company_id)
+        )
+        existing_orms = ex_result.scalars().all()
+        existing_metrics = [
+            NormalizedMetric(
+                id=e.id,
+                company_id=e.company_id,
+                document_id=e.document_id or "",
+                metric_key=e.metric_key,
+                metric_value=e.metric_value,
+                currency=Currency(code=e.currency),
+                fiscal_period=(
+                    FiscalPeriod(year=e.fiscal_year, period_type=FiscalPeriodType(e.fiscal_period))
+                    if e.fiscal_year and e.fiscal_period else None
+                ),
+                confidence=ConfidenceScore(value=e.confidence_score),
+                source_citation=e.source_citation or {},
+            )
+            for e in existing_orms
+        ]
+
+        resolver = ConflictResolver()
+        conflict_res = resolver.resolve_conflicts(metrics, existing_metrics)
+        metrics = conflict_res.resolved_metrics
+        for c_audit in conflict_res.audit_logs:
+            c_orm = AuditLogORM(
+                id=c_audit.id,
+                action=c_audit.action.value,
+                entity_type=c_audit.entity_type,
+                entity_id=c_audit.entity_id,
+                description=c_audit.description,
+                old_state=c_audit.old_state,
+                new_state=c_audit.new_state,
+            )
+            db.add(c_orm)
 
         # ---- VALIDATION ----
         flat_metrics = {m.metric_key: m.metric_value for m in metrics}

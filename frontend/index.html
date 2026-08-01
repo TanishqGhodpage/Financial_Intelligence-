@@ -150,8 +150,8 @@
                 </div>
                 <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
                   <p>Drop file(s) or click to browse</p>
-                  <span class="dropzone-hint">.csv, .xlsx</span>
-                  <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" multiple onchange="handleFileSelect(event)" />
+                  <span class="dropzone-hint">.csv, .xlsx, .pdf, .png, .jpg</span>
+                  <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg" style="display:none" multiple onchange="handleFileSelect(event)" />
                 </div>
                 <div id="file-selected" class="file-selected hidden"></div>
                 <button type="submit" class="btn btn-primary mt-2 w-full" id="upload-btn">Ingest Files</button>

@@ -23,6 +23,7 @@ pydantic-settings==2.2.1
 python-multipart==0.0.9
 openai==1.30.1
 yfinance>=0.2.40
+pypdf>=4.0.0
 
 # Testing
 pytest==8.2.0

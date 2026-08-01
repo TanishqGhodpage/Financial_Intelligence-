@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from adapters.outbound.postgres.connection import create_tables
-from adapters.inbound.endpoints import companies, documents, analytics, jobs
+from adapters.inbound.endpoints import companies, documents, analytics, jobs, audit
 from configs.settings import get_settings
 
 logging.basicConfig(
@@ -55,6 +55,7 @@ app.include_router(companies.router, prefix="/api/v1/companies", tags=["Companie
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Logs"])
 
 # ---------------------------------------------------------------------------
 # Startup

@@ -572,21 +572,38 @@ function formatBig(n) {
 // ============================================================
 // AUDIT
 // ============================================================
-function loadAuditPreview() {
+async function loadAuditPreview() {
   const el = document.getElementById('audit-log-list');
-  if (!_jobs.length) {
-    el.innerHTML = '<div class="empty-state">No audit events generated yet. Complete an ingestion job first.</div>';
-    return;
-  }
-  el.innerHTML = _jobs.slice().reverse().map(j => `
-    <div class="audit-item">
-      <div class="audit-dot"></div>
-      <div>
-        <div class="audit-action">Data Ingestion</div>
-        <div class="audit-desc">Job ${j.job_id} (${j.status}). ${j.rows_stored || 0} metrics stored.</div>
+  try {
+    const res = await fetch(`${API}/audit?limit=50`);
+    if (!res.ok) throw new Error();
+    const logs = await res.json();
+
+    if (!logs.length) {
+      el.innerHTML = '<div class="empty-state">No audit events generated yet. Ingest data to generate immutable logs.</div>';
+      return;
+    }
+
+    el.innerHTML = logs.map(l => `
+      <div class="audit-item">
+        <div class="audit-dot" style="background:${l.action === 'CORRECTION' ? 'var(--accent-amber)' : 'var(--accent)'}"></div>
+        <div style="flex:1">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="audit-action">${l.action}</span>
+            <span style="font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono'">${l.timestamp ? new Date(l.timestamp).toLocaleString() : ''}</span>
+          </div>
+          <div class="audit-desc" style="margin-top:4px">${l.description || 'System event recorded'}</div>
+          ${l.old_state || l.new_state ? `
+            <div style="font-size:11px; font-family:'JetBrains Mono'; color:var(--text-muted); margin-top:4px; background:rgba(0,0,0,0.2); padding:4px 8px; border-radius:4px">
+              ${l.action === 'CORRECTION' ? `Resolved Value: ${l.new_state?.value} (Authority: ${l.new_state?.authority})` : `Payload: ${JSON.stringify(l.new_state || {})}`}
+            </div>
+          ` : ''}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Could not load audit logs. Verify server status.</div>';
+  }
 }
 
 // ============================================================
