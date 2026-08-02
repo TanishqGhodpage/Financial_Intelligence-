@@ -333,3 +333,55 @@ select option { background: var(--bg-elevated); }
 .note-card-title { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
 .note-card-meta { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 
+/* ----------------------------------------------------------------
+   Financial Modeling Suite (Phase 4B)
+   ---------------------------------------------------------------- */
+.sens-cell {
+  padding: 10px 14px; text-align: right; font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
+}
+.sens-cell.baseline-cell { border: 2px solid var(--accent) !important; font-weight: 800; }
+
+.badge-fav {
+  background: rgba(34,197,94,0.15); color: var(--accent-green);
+  border: 1px solid var(--accent-green); padding: 2px 6px; border-radius: 2px;
+  font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+}
+.badge-unfav {
+  background: rgba(239,68,68,0.15); color: var(--accent-red);
+  border: 1px solid var(--accent-red); padding: 2px 6px; border-radius: 2px;
+  font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+}
+.badge-neutral {
+  background: var(--bg-elevated); color: var(--text-muted);
+  border: 1px solid var(--border); padding: 2px 6px; border-radius: 2px;
+  font-size: 10px; font-family: 'JetBrains Mono', monospace;
+}
+
+.stress-card {
+  padding: 20px; background: var(--bg-surface); border: 1px solid var(--border);
+}
+.stress-safe { border-left: 4px solid var(--accent-green); }
+.stress-moderate_stress { border-left: 4px solid var(--accent-amber); }
+.stress-severe_stress { border-left: 4px solid #f97316; }
+.stress-distress { border-left: 4px solid var(--accent-red); background: rgba(239,68,68,0.05); }
+
+/* Polish & Enterprise UX Styling */
+.accounting-neg { color: var(--accent-red); font-weight: 600; }
+.trend-up { color: var(--accent-green); font-weight: 700; }
+.trend-down { color: var(--accent-red); font-weight: 700; }
+
+.risk-badge-low { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid var(--accent-green); padding: 2px 6px; border-radius: 2px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono'; }
+.risk-badge-moderate { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); padding: 2px 6px; border-radius: 2px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono'; }
+.risk-badge-high { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 2px 6px; border-radius: 2px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono'; }
+
+.driver-item {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; padding: 4px 0; border-bottom: 1px dotted var(--border);
+}
+.driver-item:last-child { border-bottom: none; }
+.driver-name { color: var(--text-primary); font-weight: 600; }
+.driver-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+
+
+

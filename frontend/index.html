@@ -24,6 +24,9 @@
     <button class="nav-item" id="nav-exec" onclick="switchTab('exec')">
       Executive Dashboard
     </button>
+    <button class="nav-item" id="nav-modeling" onclick="switchTab('modeling')">
+      Financial Modeling
+    </button>
     <button class="nav-item" id="nav-companies" onclick="switchTab('companies')">
       Portfolio
     </button>
@@ -395,6 +398,161 @@
       </div>
     </div>
 
+  </section>
+
+  <!-- FINANCIAL MODELING SUITE TAB (Phase 4B) -->
+  <section class="tab-content" id="tab-modeling">
+    <!-- Sub-Navigation Toolbar -->
+    <div class="card mb-4" style="padding:12px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-secondary active" id="btn-mod-scenarios" onclick="switchModelingSubTab('scenarios')">🎲 Scenario Engine</button>
+        <button class="btn btn-secondary" id="btn-mod-sensitivity" onclick="switchModelingSubTab('sensitivity')">🌡️ Sensitivity Matrix (N×M)</button>
+        <button class="btn btn-secondary" id="btn-mod-stress" onclick="switchModelingSubTab('stress')">⚡ Stress Test Engine</button>
+        <button class="btn btn-secondary" id="btn-mod-forecast" onclick="switchModelingSubTab('forecast')">📈 Forecast Strategy</button>
+        <button class="btn btn-secondary" id="btn-mod-variance" onclick="switchModelingSubTab('variance')">⚖️ Variance Analysis</button>
+      </div>
+    </div>
+
+    <!-- 1. SCENARIOS PANEL -->
+    <div id="sub-modeling-scenarios">
+      <div id="scenario-summary-banner" class="card mb-4 hidden" style="background:var(--bg-elevated); border-left:4px solid var(--accent-blue); padding:16px;">
+        <div style="font-size:11px; font-weight:700; color:var(--accent-blue); text-transform:uppercase; margin-bottom:4px;">Executive Scenario Synthesis</div>
+        <div id="scenario-summary-text" style="font-size:13px; color:var(--text-primary); line-height:1.5;"></div>
+      </div>
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3>Scenario Simulation Parameters</h3>
+          <span class="chip" style="font-size:10px; border:1px solid var(--border); padding:2px 6px;">Base / Bull / Bear / Custom</span>
+        </div>
+        <div class="form-row align-items-end mb-3">
+          <div class="form-group flex-2">
+            <label>Target Company</label>
+            <select id="mod-scen-company" onchange="runScenarioSimulation()">
+              <option value="">Select company...</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Revenue Growth (%)</label>
+            <input type="number" id="scen-rev-g" value="15" step="1" onchange="runScenarioSimulation()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>COGS Adj (%)</label>
+            <input type="number" id="scen-cogs-adj" value="-2" step="0.5" onchange="runScenarioSimulation()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Margin Adj (%)</label>
+            <input type="number" id="scen-margin-adj" value="3" step="0.5" onchange="runScenarioSimulation()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Interest Rate (bps)</label>
+            <input type="number" id="scen-rate-bps" value="200" step="50" onchange="runScenarioSimulation()" />
+          </div>
+        </div>
+      </div>
+      <div id="scenario-cards-container" class="grid-cards mb-4 hidden"></div>
+    </div>
+
+    <!-- 2. SENSITIVITY PANEL -->
+    <div id="sub-modeling-sensitivity" class="hidden">
+      <div class="card mb-4">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3>2D Sensitivity Analysis (N × M Matrix)</h3>
+          <select id="sens-type-select" onchange="runSensitivityMatrix()" style="font-size:11px; padding:4px 8px;">
+            <option value="dcf">DCF Valuation: WACC vs Terminal Growth</option>
+            <option value="margin">Earnings: Revenue Growth vs Operating Margin</option>
+          </select>
+        </div>
+        <div id="sens-matrix-wrap" style="overflow-x:auto;">
+          <div class="empty-state">Select a company in Workspace to generate sensitivity matrix.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. STRESS TEST PANEL -->
+    <div id="sub-modeling-stress" class="hidden">
+      <div class="card mb-4">
+        <div class="card-header">
+          <h3>Market Shock Parameters</h3>
+        </div>
+        <div class="form-row align-items-end mb-3">
+          <div class="form-group flex-1">
+            <label>Revenue Shock (%)</label>
+            <input type="number" id="stress-rev-shock" value="-20" step="5" onchange="runStressTest()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Margin Compression (bps)</label>
+            <input type="number" id="stress-margin-bps" value="500" step="100" onchange="runStressTest()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Debt Shock (%)</label>
+            <input type="number" id="stress-debt-shock" value="30" step="5" onchange="runStressTest()" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Rate Shock (bps)</label>
+            <input type="number" id="stress-rate-bps" value="300" step="50" onchange="runStressTest()" />
+          </div>
+        </div>
+      </div>
+      <div id="stress-result-card" class="card mb-4 hidden"></div>
+    </div>
+
+    <!-- 4. FORECASTING PANEL -->
+    <div id="sub-modeling-forecast" class="hidden">
+      <div class="card mb-4">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <h3>Time-Series Forecast Strategy Engine</h3>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div style="font-size:11px; color:var(--text-muted);">Metric:</div>
+            <select id="fore-metric-select" onchange="runForecast()" style="font-size:11px; padding:4px 8px;">
+              <option value="revenue">Revenue</option>
+              <option value="operating_income">Operating Income</option>
+              <option value="net_income">Net Income</option>
+              <option value="free_cash_flow">Free Cash Flow</option>
+              <option value="return_on_equity">Return on Equity (ROE)</option>
+              <option value="operating_margin">Operating Margin</option>
+            </select>
+            <div style="font-size:11px; color:var(--text-muted);">Model Strategy:</div>
+            <select id="fore-strategy-select" onchange="runForecast()" style="font-size:11px; padding:4px 8px;">
+              <option value="linear">Linear Regression</option>
+              <option value="sma">Simple Moving Average (SMA)</option>
+              <option value="ema">Exponential Smoothing (EMA)</option>
+              <option value="naive">Naive (Last Value)</option>
+            </select>
+          </div>
+        </div>
+        <div id="forecast-summary-banner" class="mb-3" style="font-size:12px; color:var(--text-secondary); background:var(--bg-elevated); padding:8px 12px; border:1px solid var(--border);"></div>
+        <div style="position:relative; height:350px;">
+          <canvas id="forecast-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. VARIANCE PANEL -->
+    <div id="sub-modeling-variance" class="hidden">
+      <div class="card mb-4">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h3>Actual vs Benchmark Variance & Contribution Analysis</h3>
+          <select id="var-benchmark-select" onchange="runVarianceAnalysis()" style="font-size:11px; padding:4px 8px;">
+            <option value="Forecast">Actual vs Forecast</option>
+            <option value="Budget">Actual vs Budget (-5%)</option>
+            <option value="Prior Year">Actual vs Prior Year (YoY)</option>
+          </select>
+        </div>
+        <div id="variance-drivers-grid" class="two-col-grid mb-3 hidden">
+          <div class="card" style="padding:12px; border-left:4px solid var(--accent-green);">
+            <div style="font-size:11px; font-weight:700; color:var(--accent-green); text-transform:uppercase; margin-bottom:6px;">Top Positive Drivers</div>
+            <div id="var-pos-drivers"></div>
+          </div>
+          <div class="card" style="padding:12px; border-left:4px solid var(--accent-red);">
+            <div style="font-size:11px; font-weight:700; color:var(--accent-red); text-transform:uppercase; margin-bottom:6px;">Top Negative Drivers</div>
+            <div id="var-neg-drivers"></div>
+          </div>
+        </div>
+        <div id="variance-table-wrap" style="overflow-x:auto;">
+          <div class="empty-state">Select a company to run variance analysis.</div>
+        </div>
+      </div>
+    </div>
   </section>
 
 </main>

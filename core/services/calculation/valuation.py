@@ -67,9 +67,10 @@ class DCFValuationStrategy(ValuationStrategy):
             tax_rate = inputs.get("tax_rate", 0.21)
             
             # WACC
-            equity_weight = 0.6 # Placeholder for E/V
-            debt_weight = 0.4   # Placeholder for D/V
-            wacc = (equity_weight * cost_of_equity) + (debt_weight * cost_of_debt * (1 - tax_rate))
+            if "wacc" in inputs and inputs["wacc"] is not None:
+                wacc = inputs["wacc"]
+            else:
+                wacc = (equity_weight * cost_of_equity) + (debt_weight * cost_of_debt * (1 - tax_rate))
             
             terminal_growth_rate = inputs.get("terminal_growth_rate", 0.02)
             n = context.forecast_horizon_years

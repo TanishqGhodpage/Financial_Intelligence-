@@ -60,6 +60,7 @@ function switchTab(name) {
   const titles = {
     workspace: ['Workspace', 'Unified Analysis Command Center'],
     exec: ['Executive Dashboard', 'Multi-Company Comparative Analytics & Benchmarking'],
+    modeling: ['Financial Modeling Suite', 'Deterministic Scenario Engine, Sensitivity Matrix & Stress Testing'],
     companies: ['Portfolio', 'Manage tracked financial entities'],
     audit: ['Audit Trail', 'Immutable event history'],
   };
@@ -69,6 +70,7 @@ function switchTab(name) {
 
   if (name === 'audit') loadAuditPreview();
   if (name === 'exec') loadExecutiveDashboard();
+  if (name === 'modeling') loadFinancialModelingSuite();
 }
 
 // ============================================================
@@ -1340,4 +1342,489 @@ function exportComparisonCSV() {
   URL.revokeObjectURL(url);
   toast('CSV Exported', 'success');
 }
+
+// ============================================================
+// FINANCIAL MODELING SUITE (Phase 4B Polish)
+// ============================================================
+
+let _forecastChart = null;
+
+function formatFinancialValue(val, type = 'currency') {
+  if (val === null || val === undefined || isNaN(val)) return '—';
+
+  const isNeg = val < 0;
+  const absVal = Math.abs(val);
+
+  if (type === 'currency') {
+    let formatted = '';
+    if (absVal >= 1e12) formatted = `$${(absVal / 1e12).toFixed(2)}T`;
+    else if (absVal >= 1e9) formatted = `$${(absVal / 1e9).toFixed(2)}B`;
+    else if (absVal >= 1e6) formatted = `$${(absVal / 1e6).toFixed(1)}M`;
+    else if (absVal >= 1e3) formatted = `$${(absVal / 1e3).toFixed(0)}K`;
+    else formatted = `$${absVal.toFixed(2)}`;
+
+    return isNeg ? `(${formatted})` : formatted;
+  }
+
+  if (type === 'ratio') {
+    return `${val.toFixed(2)}×`;
+  }
+
+  if (type === 'percent') {
+    const sign = val > 0 ? '+' : '';
+    return `${sign}${(val * 100).toFixed(1)}%`;
+  }
+
+  if (type === 'bps') {
+    const sign = val > 0 ? '+' : '';
+    return `${sign}${val.toFixed(0)} bps`;
+  }
+
+  return val.toLocaleString();
+}
+
+function loadFinancialModelingSuite() {
+  const sel = document.getElementById('mod-scen-company');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select company...</option>';
+  if (_companies && _companies.length) {
+    _companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.ticker} - ${c.name}`;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+    else if (_companies[0]) sel.value = _companies[0].id;
+  }
+
+  if (sel.value) {
+    runScenarioSimulation();
+  }
+}
+
+function switchModelingSubTab(tabName) {
+  const tabs = ['scenarios', 'sensitivity', 'stress', 'forecast', 'variance'];
+  tabs.forEach(t => {
+    document.getElementById(`sub-modeling-${t}`).classList.add('hidden');
+    document.getElementById(`btn-mod-${t}`).classList.remove('active');
+  });
+
+  document.getElementById(`sub-modeling-${tabName}`).classList.remove('hidden');
+  document.getElementById(`btn-mod-${tabName}`).classList.add('active');
+
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  if (tabName === 'scenarios') runScenarioSimulation();
+  else if (tabName === 'sensitivity') runSensitivityMatrix();
+  else if (tabName === 'stress') runStressTest();
+  else if (tabName === 'forecast') runForecast();
+  else if (tabName === 'variance') runVarianceAnalysis();
+}
+
+async function runScenarioSimulation() {
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  const revG = parseFloat(document.getElementById('scen-rev-g').value) / 100 || 0.15;
+  const cogsAdj = parseFloat(document.getElementById('scen-cogs-adj').value) / 100 || -0.02;
+  const marginAdj = parseFloat(document.getElementById('scen-margin-adj').value) / 100 || 0.03;
+  const rateBps = parseFloat(document.getElementById('scen-rate-bps').value) || 200;
+
+  try {
+    const res = await fetch(`${API}/modeling/scenarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: companyId,
+        fiscal_year: 2024,
+        revenue_growth_pct: revG,
+        cogs_ratio_adj: cogsAdj,
+        op_margin_adj_pct: marginAdj,
+        interest_rate_adj_bps: rateBps,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    renderScenarioSummaryBanner(data.overall_executive_summary);
+    renderScenarioCards(data.scenarios);
+  } catch (err) {
+    console.warn('Scenario simulation error:', err);
+  }
+}
+
+function renderScenarioSummaryBanner(summaryText) {
+  const banner = document.getElementById('scenario-summary-banner');
+  const textEl = document.getElementById('scenario-summary-text');
+  if (summaryText) {
+    textEl.textContent = summaryText;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+function renderScenarioCards(scenarios) {
+  const container = document.getElementById('scenario-cards-container');
+  if (!scenarios) { container.classList.add('hidden'); return; }
+
+  const items = Object.entries(scenarios);
+  container.innerHTML = items.map(([key, s]) => {
+    const riskBadgeClass = s.risk_level === 'HIGH' ? 'risk-badge-high' : s.risk_level === 'MODERATE' ? 'risk-badge-moderate' : 'risk-badge-low';
+
+    return `
+      <div class="exec-card" style="border-top: 3px solid ${key === 'bull' ? '#22c55e' : key === 'bear' ? '#ef4444' : key === 'custom' ? '#a855f7' : '#3b82f6'};">
+        <div class="exec-card-header mb-2">
+          <div>
+            <strong style="color:var(--text-primary); font-size:14px;">${s.scenario_name}</strong>
+          </div>
+          <div style="display:flex; gap:4px; align-items:center;">
+            <span class="${riskBadgeClass}">${s.risk_level} RISK</span>
+            <span class="chip" style="font-size:10px;">${key.toUpperCase()}</span>
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:var(--text-secondary); line-height:1.4; margin-bottom:12px; font-style:italic;">
+          "${s.executive_summary || 'Standard scenario simulation model.'}"
+        </div>
+
+        <div style="margin-bottom:12px; background:var(--bg-elevated); padding:8px 12px; border-radius:4px; border:1px solid var(--border);">
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">DCF Equity Valuation</div>
+          <div style="font-size:22px; font-weight:700; color:var(--accent-green); font-family:'JetBrains Mono';">${formatFinancialValue(s.dcf_equity_value * 1e6, 'currency')}</div>
+        </div>
+
+        <div style="font-size:11px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dotted var(--border);">
+            <span style="color:var(--text-muted);">Projected Revenue</span>
+            <span style="font-family:'JetBrains Mono'; font-weight:600;">${formatFinancialValue(s.statement_impact.revenue * 1e6, 'currency')}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dotted var(--border);">
+            <span style="color:var(--text-muted);">Operating Income</span>
+            <span style="font-family:'JetBrains Mono'; font-weight:600;">${formatFinancialValue(s.statement_impact.operating_income * 1e6, 'currency')}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:3px 0;">
+            <span style="color:var(--text-muted);">Net Income</span>
+            <span style="font-family:'JetBrains Mono'; font-weight:600;">${formatFinancialValue(s.statement_impact.net_income * 1e6, 'currency')}</span>
+          </div>
+        </div>
+
+        ${s.primary_drivers && s.primary_drivers.length ? `
+          <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Primary Drivers</div>
+            <div style="font-size:10px; color:var(--text-secondary);">
+              ${s.primary_drivers.map(d => `<div>• ${d}</div>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  container.classList.remove('hidden');
+}
+
+async function runSensitivityMatrix() {
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  const sensType = document.getElementById('sens-type-select').value;
+  const wrap = document.getElementById('sens-matrix-wrap');
+
+  try {
+    const res = await fetch(`${API}/modeling/sensitivity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: companyId, sensitivity_type: sensType, fiscal_year: 2024 }),
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    renderSensitivityHeatmap(data, wrap);
+  } catch (err) {
+    wrap.innerHTML = '<div class="empty-state">Error loading sensitivity matrix.</div>';
+  }
+}
+
+function renderSensitivityHeatmap(data, wrap) {
+  const matrix = data.grid_matrix;
+  const rowVals = data.row_values;
+  const colVals = data.col_values;
+  const minV = data.min_value;
+  const maxV = data.max_value;
+
+  let html = `
+    <div style="margin-bottom:12px; background:var(--bg-elevated); padding:12px; border-left:4px solid var(--accent); border-radius:4px;">
+      <div style="font-size:12px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">${data.target_metric_name} Sensitivity Analysis</div>
+      <div style="font-size:11px; color:var(--text-secondary); line-height:1.4;">${data.executive_summary || 'Varying parameters to model metric response sensitivity.'}</div>
+      <div style="display:flex; gap:16px; margin-top:8px; font-size:10px; color:var(--text-muted);">
+        <div>🟢 <strong>Optimal:</strong> ${data.optimal_region_summary || 'Top-right zone'}</div>
+        <div>🔴 <strong>Risk:</strong> ${data.risk_region_summary || 'Bottom-left zone'}</div>
+      </div>
+    </div>
+    <table class="data-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="background:var(--bg-elevated); font-size:11px;">${data.row_parameter_name} \\ ${data.col_parameter_name}</th>
+          ${colVals.map(c => `<th style="text-align:right; font-size:11px;">${c}%</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  matrix.forEach((row, rIdx) => {
+    html += `<tr><td style="font-weight:700; background:var(--bg-elevated); font-size:11px;">${rowVals[rIdx]}%</td>`;
+    row.forEach((val, cIdx) => {
+      const isBaseline = rIdx === data.baseline_row_idx && cIdx === data.baseline_col_idx;
+
+      let bgStyle = '';
+      if (maxV > minV && val > 0) {
+        const ratio = (val - minV) / (maxV - minV);
+        if (ratio >= 0.5) {
+          const alpha = (ratio - 0.5) * 0.5 + 0.1;
+          bgStyle = `background: rgba(34,197,94,${alpha.toFixed(2)}); color: #86efac;`;
+        } else {
+          const alpha = (0.5 - ratio) * 0.5 + 0.1;
+          bgStyle = `background: rgba(239,68,68,${alpha.toFixed(2)}); color: #fca5a5;`;
+        }
+      }
+
+      html += `<td class="sens-cell ${isBaseline ? 'baseline-cell' : ''}" style="${bgStyle}">
+        ${formatFinancialValue(val * (data.target_metric_key === 'equity_value' ? 1e6 : 1), data.target_metric_key === 'equity_value' ? 'currency' : 'percent')}
+        ${isBaseline ? '<div style="font-size:8px; font-weight:800; color:var(--accent);">[BASE CASE]</div>' : ''}
+      </td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function runStressTest() {
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  const revShock = parseFloat(document.getElementById('stress-rev-shock').value) / 100 || -0.20;
+  const marginBps = parseFloat(document.getElementById('stress-margin-bps').value) || 500;
+  const debtShock = parseFloat(document.getElementById('stress-debt-shock').value) / 100 || 0.30;
+  const rateBps = parseFloat(document.getElementById('stress-rate-bps').value) || 300;
+
+  const card = document.getElementById('stress-result-card');
+
+  try {
+    const res = await fetch(`${API}/modeling/stress-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: companyId,
+        revenue_shock_pct: revShock,
+        margin_compression_bps: marginBps,
+        debt_shock_pct: debtShock,
+        interest_rate_shock_bps: rateBps,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    renderStressResult(data, card);
+  } catch (err) {
+    card.classList.add('hidden');
+  }
+}
+
+function renderStressResult(data, card) {
+  const levelClass = `stress-${data.stress_level}`;
+  const levelLabel = data.stress_level.toUpperCase().replace('_', ' ');
+
+  card.className = `card mb-4 stress-card ${levelClass}`;
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <h3 style="margin-bottom:4px;">Market Shock Stress Risk Assessment</h3>
+        <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">${data.business_outcome_summary || data.risk_summary.join(' ')}</div>
+      </div>
+      <div>
+        <span class="chip" style="font-size:12px; font-weight:800; padding:6px 12px; font-family:'JetBrains Mono'; background:var(--bg-elevated); border:1px solid var(--border);">
+          STATUS: ${levelLabel}
+        </span>
+      </div>
+    </div>
+
+    ${data.insolvency_warning ? `
+      <div class="alert alert-error mb-3" style="margin-top:0;">
+        ⚠️ <strong>INSOLVENCY WARNING:</strong> Current Ratio or Interest Coverage breached minimum safety thresholds post-shock!
+      </div>
+    ` : ''}
+
+    <div class="result-grid mb-3">
+      <div class="result-stat">
+        <div class="result-stat-label">Post-Shock Equity Value</div>
+        <div class="result-stat-value" style="color:var(--accent-green)">${formatFinancialValue(data.post_shock_dcf_equity_value * 1e6, 'currency')}</div>
+      </div>
+      <div class="result-stat">
+        <div class="result-stat-label">Liquidity Status</div>
+        <div class="result-stat-value" style="font-size:14px;">${data.liquidity_status || (data.post_shock_metrics.current_ratio || 0).toFixed(2) + '×'}</div>
+      </div>
+      <div class="result-stat">
+        <div class="result-stat-label">Debt Coverage Status</div>
+        <div class="result-stat-value" style="font-size:14px;">${data.debt_coverage_status || (data.post_shock_metrics.interest_coverage || 0).toFixed(2) + '×'}</div>
+      </div>
+    </div>
+
+    ${data.analyst_next_steps && data.analyst_next_steps.length ? `
+      <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:10px;">
+        <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Analyst Recommended Actions</div>
+        <div style="font-size:11px; color:var(--text-secondary);">
+          ${data.analyst_next_steps.map(step => `<div style="padding:2px 0;">• ${step}</div>`).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+
+  card.classList.remove('hidden');
+}
+
+async function runForecast() {
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  const metricKey = document.getElementById('fore-metric-select').value;
+  const strategyType = document.getElementById('fore-strategy-select').value;
+  const ctx = document.getElementById('forecast-chart').getContext('2d');
+  const banner = document.getElementById('forecast-summary-banner');
+
+  try {
+    const res = await fetch(`${API}/modeling/forecast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: companyId, metric_key: metricKey, strategy_type: strategyType, periods_ahead: 3 }),
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    if (banner) {
+      banner.innerHTML = `
+        <strong>${data.strategy_name} Model Summary:</strong> ${data.executive_summary || ''} 
+        <span class="chip" style="font-size:10px; margin-left:8px;">Vol: ${data.volatility_level || 'LOW'}</span>
+      `;
+    }
+
+    if (_forecastChart) _forecastChart.destroy();
+
+    const allPoints = data.historical_points.concat(data.projected_points);
+    const labels = allPoints.map(p => p.year);
+
+    const histValues = allPoints.map(p => !p.is_projected ? p.value : null);
+    const projValues = allPoints.map(p => p.is_projected ? p.value : null);
+    if (data.historical_points.length && data.projected_points.length) {
+      projValues[data.historical_points.length - 1] = data.historical_points[data.historical_points.length - 1].value;
+    }
+
+    _forecastChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Historical Actuals', data: histValues, borderColor: '#3b82f6', backgroundColor: '#3b82f6', borderWidth: 2 },
+          { label: `Projected (${data.strategy_name})`, data: projValues, borderColor: '#22c55e', backgroundColor: '#22c55e', borderDash: [5, 5], borderWidth: 2 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#fafafa', font: { family: 'JetBrains Mono' } } } },
+        scales: {
+          x: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono' } } },
+          y: { grid: { color: '#27272a' }, ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono' } } },
+        },
+      },
+    });
+  } catch (err) {
+    console.warn('Forecast error:', err);
+  }
+}
+
+async function runVarianceAnalysis() {
+  const companyId = document.getElementById('mod-scen-company').value;
+  if (!companyId) return;
+
+  const benchName = document.getElementById('var-benchmark-select').value;
+  const wrap = document.getElementById('variance-table-wrap');
+  const driversGrid = document.getElementById('variance-drivers-grid');
+  const posDriversEl = document.getElementById('var-pos-drivers');
+  const negDriversEl = document.getElementById('var-neg-drivers');
+
+  try {
+    const res = await fetch(`${API}/modeling/variance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: companyId, benchmark_name: benchName, fiscal_year: 2024 }),
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    if (driversGrid && posDriversEl && negDriversEl) {
+      posDriversEl.innerHTML = (data.top_positive_drivers || []).map(d => `
+        <div class="driver-item">
+          <span class="driver-name">${d.name}</span>
+          <span class="driver-val" style="color:var(--accent-green);">+${d.contrib_pct}% contribution</span>
+        </div>
+      `).join('') || '<div style="font-size:11px; color:var(--text-muted);">None</div>';
+
+      negDriversEl.innerHTML = (data.top_negative_drivers || []).map(d => `
+        <div class="driver-item">
+          <span class="driver-name">${d.name}</span>
+          <span class="driver-val" style="color:var(--accent-red);">${d.contrib_pct}% contribution</span>
+        </div>
+      `).join('') || '<div style="font-size:11px; color:var(--text-muted);">None</div>';
+
+      driversGrid.classList.remove('hidden');
+    }
+
+    let html = `
+      <div style="margin-bottom:10px; font-size:11px; color:var(--text-secondary); background:var(--bg-elevated); padding:8px 12px; border-left:3px solid var(--accent);">
+        <strong>Executive Takeaway:</strong> ${data.business_change_summary || data.net_variance_summary}
+      </div>
+      <table class="data-table" style="width:100%;">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Metric</th>
+            <th style="text-align:right;">Actual</th>
+            <th style="text-align:right;">Benchmark (${benchName})</th>
+            <th style="text-align:right;">Variance (Abs)</th>
+            <th style="text-align:right;">Variance (%)</th>
+            <th style="text-align:center;">Direction</th>
+            <th style="text-align:right;">Contribution</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    data.metrics_variance.forEach(m => {
+      const badgeClass = m.variance_type === 'Favorable' ? 'badge-fav' : m.variance_type === 'Unfavorable' ? 'badge-unfav' : 'badge-neutral';
+      html += `
+        <tr>
+          <td style="padding:8px 12px; border-bottom:1px solid var(--border);">
+            <strong>${m.name}</strong>
+          </td>
+          <td style="text-align:right; border-bottom:1px solid var(--border); font-family:'JetBrains Mono'; font-weight:600;">${formatFinancialValue(m.actual_value, m.unit === 'ratio' ? 'ratio' : m.unit === 'percent' ? 'percent' : 'currency')}</td>
+          <td style="text-align:right; border-bottom:1px solid var(--border); font-family:'JetBrains Mono'; color:var(--text-secondary);">${formatFinancialValue(m.benchmark_value, m.unit === 'ratio' ? 'ratio' : m.unit === 'percent' ? 'percent' : 'currency')}</td>
+          <td style="text-align:right; border-bottom:1px solid var(--border); font-family:'JetBrains Mono';">${m.absolute_variance > 0 ? '+' : ''}${formatFinancialValue(m.absolute_variance, m.unit === 'ratio' ? 'ratio' : m.unit === 'percent' ? 'percent' : 'currency')}</td>
+          <td style="text-align:right; border-bottom:1px solid var(--border); font-family:'JetBrains Mono';">${m.relative_variance_pct > 0 ? '+' : ''}${m.relative_variance_pct.toFixed(2)}%</td>
+          <td style="text-align:center; border-bottom:1px solid var(--border);"><span class="${badgeClass}">${m.variance_type.toUpperCase()}</span></td>
+          <td style="text-align:right; border-bottom:1px solid var(--border); font-family:'JetBrains Mono'; color:var(--text-muted);">${m.contribution_pct.toFixed(1)}%</td>
+        </tr>
+      `;
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  } catch (err) {
+    wrap.innerHTML = '<div class="empty-state">Error running variance analysis.</div>';
+  }
+}
+
+
 
